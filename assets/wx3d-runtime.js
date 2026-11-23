@@ -340,19 +340,27 @@
           }, top ? F : B));
         });
 
-        // —— 垂下飘带：从围脖前侧(theta≈PI/2, 即 +Z 朝前)垂下，S 形弯曲 + 柔褶 ——
-        var SW2 = 0.82, SL = 2.85;
+        // —— 垂下飘带（v28：消除中空）——
+        // 真实围巾的飘带不是悬在圈中央的空洞里，而是从围脖圈顶内侧搭上去、
+        // 翻过圈的前缘、贴着圈外壁垂下，再自然飘落。整段与围脖连为一体，不再中空。
+        var SW2 = 0.92;
+        var drapeCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.10, neckY + 0.30, NR - 0.58),              // 圈顶内侧起点（搭在圈上）
+          new THREE.Vector3(-0.06, neckY + NH * 0.5 + 0.05, NR - 0.16),   // 抬到圈顶缘
+          new THREE.Vector3(-0.02, neckY + NH * 0.5 + 0.03, NR + 0.13),   // 翻过前缘到外侧
+          new THREE.Vector3( 0.02, neckY + 0.08, NR + 0.17),              // 贴外壁中段
+          new THREE.Vector3( 0.06, neckY - NH * 0.5 + 0.02, NR + 0.15),   // 贴外壁下缘
+          new THREE.Vector3( 0.10, neckY - NH * 0.5 - 0.55, NR + 0.06),   // 脱离圈继续垂
+          new THREE.Vector3( 0.20, neckY - NH * 0.5 - 1.55, NR - 0.03),   // 垂下中段
+          new THREE.Vector3( 0.12, neckY - NH * 0.5 - 2.45, NR + 0.05)    // 飘带末端
+        ]);
         function drapePoint(u, v) {
-          // u 0..1 带宽, v 0..1 从环口向下
-          var x = (u - 0.5) * SW2;
-          var drop = v * SL;
-          var y = neckY - 0.15 - drop;
-          // 飘带向前下方自然摆动 + 轻微左右 S 弯
-          var z = 0.22 + 0.16 * Math.sin(v * Math.PI * 0.9)
-                + 0.1 * v + 0.05 * Math.sin(u * Math.PI * 2 + v * 3.0);
-          x += 0.14 * Math.sin(v * Math.PI * 1.2) + 0.06 * Math.sin(v * 5.0);
-          // 布面柔褶：横向波纹随下垂逐渐平缓
-          z += 0.045 * Math.sin(u * Math.PI * 4.0) * (1 - 0.5 * v);
+          // u 0..1 带宽, v 0..1 沿飘带中心线（从圈顶搭口到垂下末端）
+          var C = drapeCurve.getPoint(Math.max(0, Math.min(1, v)));
+          var x = C.x + (u - 0.5) * SW2;
+          var y = C.y + 0.015 * Math.sin(u * Math.PI * 3.0 + v * 2.0);
+          var z = C.z + 0.035 * Math.sin(u * Math.PI * 4.0) * (1 - 0.5 * v)
+                      + 0.02 * Math.sin(v * Math.PI * 3.0);
           return [x, y, z];
         }
         g.add(gridMesh(20, 48, function (v, u) {
