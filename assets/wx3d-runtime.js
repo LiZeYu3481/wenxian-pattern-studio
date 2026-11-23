@@ -61,6 +61,7 @@
     host: null, renderer: null, scene: null, camera: null, group: null,
     frontMat: null, backMat: null, sideMat: null, innerMat: null,
     fabricMat: null, woodMat: null, accentMat: null, trimMat: null,
+    umbrellaMetal: null, umbrellaShaft: null,
     target: { rx: -0.08, ry: -0.32 }, drag: false, lx: 0, ly: 0,
     raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null
   };
@@ -666,39 +667,64 @@
       return { group: g, shadowY: -1.94, shadowR: 1.5 };
 
     } else if (pid === 'umbrella') {
-      // 晴雨伞（v10）：8 瓣分段伞面（每瓣边缘有扇贝波浪）+ 8 根外露伞骨 + 直杆弯钩柄 + 伞尖。
-      var R = 1.95, cy = 1.6, PANELS = 8;
-      var seg = 10; // 每瓣径向细分
-      // 伞面：按瓣生成，瓣间有轻微起伏，边缘扇贝
+      // 晴雨伞（v19 对照参考图重做）：饱满圆弧伞面 + 扇贝波浪边 + 银灰金属主骨/副骨
+      // + 黑色中棒 + 滑环开关 + 多层金属伞帽 + 粗壮 J 形弯钩柄。纹样仍由用户纹样 F 决定。
+      var R = 1.95, cy = 1.62, PANELS = 8, DROP = 1.14;
+      var UM = M.umbrellaMetal, US = M.umbrellaShaft;
+      // 伞面高度曲线：抛物线穹顶，中心高、边缘低；参考图为饱满圆弧而非扁平斗笠。
+      function canopyY(v) { return cy - DROP * Math.pow(v, 1.72); }
+      // 每瓣轮廓半径：扇贝波浪——瓣中央(u=0.5)略内收、瓣缝(u=0/1) 伞骨尖角略外凸。
+      function scallop(u, v) { return 1 - 0.055 * Math.cos((u - 0.5) * Math.PI * 2) * Math.pow(v, 3); }
+      // 伞面：按瓣生成，正反面都是纹样（F 双面材质），边缘扇贝清晰。
       for (var pn = 0; pn < PANELS; pn++) {
         (function (idx) {
           var a0 = idx / PANELS * Math.PI * 2, a1 = (idx + 1) / PANELS * Math.PI * 2;
-          g.add(gridMesh(seg, 10, function (v, u) {
+          g.add(gridMesh(12, 12, function (v, u) {
             var ang = a0 + (a1 - a0) * u;
-            var rr = R * v;
-            var scallop = 1 + 0.03 * Math.cos((u - 0.5) * Math.PI * 2) * Math.pow(v, 3);
-            var yy = cy - 0.82 * Math.pow(v, 1.5);
-            // 瓣中央略高、边缘略低，形成伞骨撑起的起伏
-            yy += 0.05 * Math.sin(u * Math.PI) * Math.pow(v, 1.2);
-            return [rr * scallop * Math.cos(ang), yy, rr * scallop * Math.sin(ang),
+            var rr = R * v * scallop(u, v);
+            var yy = canopyY(v);
+            // 瓣中央略低、折痕(伞骨)处略高，撑出布料起伏（幅度小，避免锯齿）。
+            yy -= 0.035 * Math.sin(u * Math.PI) * Math.pow(v, 1.1);
+            return [rr * Math.cos(ang), yy, rr * Math.sin(ang),
               idx / PANELS + u / PANELS, v];
           }, F));
         })(pn);
       }
-      // 8 根伞骨：沿每瓣中线，从伞顶到伞缘
-      for (var r = 0; r < PANELS; r++) {
-        var mid = (r + 0.5) / PANELS * Math.PI * 2;
+      // 伞骨骨架：沿每瓣的分缝（折痕线）走，位于伞布内侧（y 略低 0.02），银灰金属。
+      var ribRadii = [0.0, 0.26, 0.52, 0.78, 1.0];
+      for (var rb = 0; rb < PANELS; rb++) {
+        var ang = rb / PANELS * Math.PI * 2;
+        var pts = ribRadii.map(function (v) {
+          // 折痕线在 u=0 处，scallop(0,v) 为尖角；下沉 0.075 藏进伞布内侧，俯视不穿透伞面。
+          var rr = R * v * scallop(0, v) - 0.02;
+          return [rr * Math.cos(ang), canopyY(v) - 0.075, rr * Math.sin(ang)];
+        });
+        g.add(pipe(pts, UM, 0.015, 26));
+        // 副骨撑杆：从中部主骨斜撑向中棒上的滑环，仰视可见三角支撑（参考图细节）。
+        var midV = 0.52, midR = R * midV * scallop(0, midV) - 0.02;
+        var collarY = cy - DROP * 0.72;
         g.add(pipe([
-          [0, cy - 0.04, 0],
-          [R * 0.5 * Math.cos(mid), cy - 0.32, R * 0.5 * Math.sin(mid)],
-          [R * 0.98 * Math.cos(mid), cy - 0.84, R * 0.98 * Math.sin(mid)]
-        ], W, 0.02, 26));
+          [midR * Math.cos(ang), canopyY(midV) - 0.075, midR * Math.sin(ang)],
+          [midR * 0.52 * Math.cos(ang), (canopyY(midV) + collarY) * 0.5 - 0.075, midR * 0.52 * Math.sin(ang)],
+          [0.075 * Math.cos(ang), collarY, 0.075 * Math.sin(ang)]
+        ], UM, 0.01, 20));
       }
-      // 伞杆 + 弯钩柄 + 伞尖
-      g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.0, 12), W, 0, -0.62, 0));
-      g.add(pipe([[0, -2.1, 0], [0.04, -2.34, 0], [0.22, -2.48, 0], [0.42, -2.34, 0]], W, 0.055, 28));
-      g.add(mesh(new THREE.ConeGeometry(0.075, 0.3, 12), W, 0, cy + 0.14, 0));
-      return { group: g, shadowY: -2.5, shadowR: 1.9 };
+      // 中棒：黑色，从伞帽下方一直贯穿到手柄（顶部≈1.6，底部≈-2.33，与手柄无缝衔接）。
+      g.add(mesh(new THREE.CylinderGeometry(0.042, 0.046, 3.95, 14), US, 0, -0.36, 0));
+      // 滑环开关：中棒上的金属滑套 + 按钮。
+      var collarY2 = cy - DROP * 0.72;
+      g.add(mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.14, 16), UM, 0, collarY2, 0));
+      g.add(mesh(new THREE.BoxGeometry(0.06, 0.1, 0.05), UM, 0, collarY2 + 0.14, 0.07));
+      // 多层金属伞帽：底座圆盘 + 塔身 + 尖顶。
+      g.add(mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.06, 18), UM, 0, cy + 0.005, 0));
+      g.add(mesh(new THREE.CylinderGeometry(0.095, 0.12, 0.16, 16), UM, 0, cy + 0.11, 0));
+      g.add(mesh(new THREE.ConeGeometry(0.055, 0.24, 14), UM, 0, cy + 0.31, 0));
+      // 粗壮 J 形弯钩柄（黑色），参考图手柄厚实圆润。
+      g.add(pipe([
+        [0, -2.28, 0], [0, -2.52, 0], [0.03, -2.74, 0],
+        [0.2, -2.88, 0], [0.42, -2.82, 0], [0.52, -2.6, 0]
+      ], US, 0.085, 34));
+      return { group: g, shadowY: -3.0, shadowR: 1.85 };
     } else if (pid === 'fan') {
       // 折扇（用户认可，保持不变）：细分扇面折痕起伏，扇骨移到纸背后，正背都有纹样。
       var FR = 2.7, fcy = -1.55, a0 = Math.PI * 0.19, a1 = Math.PI * 0.81;
@@ -867,7 +893,10 @@
       woodMat: new THREE.MeshStandardMaterial({ color: 0x6a4b32, roughness: 0.8, metalness: 0, envMapIntensity: 0.4 }),
       accentMat: new THREE.MeshStandardMaterial({ color: 0xb79468, roughness: 0.28, metalness: 0.85, envMapIntensity: 1.1 }),
       // 托特包专用：黑色包边/织带（固定深色，不随配色变），帆布哑光。
-      trimMat: new THREE.MeshStandardMaterial({ color: 0x12100f, roughness: 0.92, metalness: 0, side: ds, envMapIntensity: 0.18 })
+      trimMat: new THREE.MeshStandardMaterial({ color: 0x12100f, roughness: 0.92, metalness: 0, side: ds, envMapIntensity: 0.18 }),
+      // 晴雨伞专用：银灰金属伞骨/伞帽（参考图的金属骨架），黑色中棒/弯钩柄。
+      umbrellaMetal: new THREE.MeshStandardMaterial({ color: 0x9b9a96, roughness: 0.38, metalness: 0.78, envMapIntensity: 0.95 }),
+      umbrellaShaft: new THREE.MeshStandardMaterial({ color: 0x161615, roughness: 0.62, metalness: 0.25, envMapIntensity: 0.5 })
     };
 
     // 陶瓷（马克杯/瓷盘）：哑光釉面 roughness≈0.75（网络规范 0.7–0.9），非塑料高光。
@@ -949,6 +978,7 @@
     S.group = group; S.frontMat = M.frontMat; S.backMat = M.backMat;
     S.sideMat = M.sideMat; S.innerMat = M.innerMat; S.fabricMat = M.fabricMat;
     S.woodMat = M.woodMat; S.accentMat = M.accentMat; S.trimMat = M.trimMat;
+    S.umbrellaMetal = M.umbrellaMetal; S.umbrellaShaft = M.umbrellaShaft;
     S.ro = ro; S.ready = true;
   }
 
@@ -957,7 +987,7 @@
     if (S.ro) S.ro.disconnect();
     if (S.group) {
       S.group.traverse(function (o) { if (o.geometry) o.geometry.dispose(); });
-      [S.frontMat, S.backMat, S.sideMat, S.innerMat, S.fabricMat, S.woodMat, S.accentMat, S.trimMat].forEach(function (m) {
+      [S.frontMat, S.backMat, S.sideMat, S.innerMat, S.fabricMat, S.woodMat, S.accentMat, S.trimMat, S.umbrellaMetal, S.umbrellaShaft].forEach(function (m) {
         if (m) { m.map = null; m.dispose(); }
       });
     }
