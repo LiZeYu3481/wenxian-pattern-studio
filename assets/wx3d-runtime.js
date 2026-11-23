@@ -247,83 +247,99 @@
         D = M.sideMat, I = M.innerMat, C = M.fabricMat, T = M.trimMat;
 
     if (pid === 'tote') {
-      // 托特包（v15 按真实黑色包边帆布托特包重做）：
-      // 参照原型——黑色包边 + 黑色织带提手 + 印花帆布铺满正/侧/底 + 方正厚实软包 + 可见深色内里。
-      // 最大改动：侧面/底面从纯色 D 改为印花 F，消除"白色纸袋"观感。
-      var HW = 1.24, HH = 1.16, depth = 0.4;
-      // 前片：中央轻微外鼓，四角收，UV 铺满
+      // 托特包（v17 对照 WorkBuddy GLB 提花托特包参考精修）：
+      // 参考模型特征：修长包身(上宽下略收)、平直方形袋口、黑色细包边、黑色织带提手带缝片、正面品牌皮标。
+      // 保留 v15/v16 已验证的优点：印花铺满正/侧/底、深色内里、黑色包边织带。
+      var HW = 1.12, HH = 1.34, depth = 0.38;
+      // 包身横向轮廓：上宽下略收（参考模型），中部略鼓
+      function halfWidthAt(vy) { // vy: 0 底 → 1 顶
+        return HW * (0.94 + 0.06 * vy);
+      }
+      // 前片：横向收分 + 中央轻微外鼓，UV 铺满
       g.add(gridMesh(28, 28, function (v, u) {
-        var px = (u - 0.5) * 2 * HW, py = (v - 0.5) * 2 * HH;
+        var w = halfWidthAt(v);
+        var px = (u - 0.5) * 2 * w, py = (v - 0.5) * 2 * HH;
         var bulge = depth * Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
         return [px, py, bulge, u, v];
       }, F));
       // 后片：同样印花外鼓
       g.add(gridMesh(28, 28, function (v, u) {
-        var px = (u - 0.5) * 2 * HW, py = (v - 0.5) * 2 * HH;
+        var w = halfWidthAt(v);
+        var px = (u - 0.5) * 2 * w, py = (v - 0.5) * 2 * HH;
         var bulge = depth * Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
         return [px, py, -bulge - 0.05, 1 - u, v];
       }, F));
-      // 左右侧片：改印花 F（关键），横向 UV 压缩避免纹样被拉长
+      // 左右侧片：印花 F，横向 UV 压缩；跟随上宽下收
       [-1, 1].forEach(function (sgn) {
         g.add(gridMesh(8, 24, function (v, u) {
           var py = (v - 0.5) * 2 * HH;
           var zz = (u - 0.5) * (2 * depth + 0.05);
-          var edge = Math.sin(Math.PI * v);
-          return [sgn * (HW - 0.03 * edge), py, zz, u * 0.42, v];
+          return [sgn * (halfWidthAt(v) - 0.03), py, zz, u * 0.42, v];
         }, F));
       });
-      // 底片：也铺印花，杜绝任何纯色白块
+      // 底片：铺印花
       g.add(gridMesh(20, 8, function (v, u) {
-        var px = (u - 0.5) * 2 * HW;
+        var px = (u - 0.5) * 2 * halfWidthAt(0);
         var zz = (v - 0.5) * (2 * depth + 0.05);
         return [px, -HH + 0.03, zz, u, v];
       }, F));
-      // 袋口：顶部内凹深色内里（俯视能看到开口）
+      // 袋口：接近平直的矩形深色内里（参考模型是平直开口，非大弧线下凹）
       g.add(gridMesh(28, 8, function (v, u) {
-        var px = (u - 0.5) * 2 * (HW - 0.04);
+        var px = (u - 0.5) * 2 * (HW - 0.03);
         var zz = (v - 0.5) * (2 * depth - 0.04);
-        var yy = HH - 0.07 - 0.11 * Math.sin(Math.PI * u);
+        var yy = HH - 0.05 - 0.04 * Math.sin(Math.PI * u);
         return [px, yy, zz, u, v];
       }, I));
-      // ── 黑色包边（原型灵魂）：袋口一圈 + 四条竖棱 + 底边一圈，用黑色细管走线 ──
-      var rim = 0.042;
-      // 袋口前后沿（跟随前片鼓起的肩线）
-      g.add(pipe([[-HW, HH - 0.02, depth + 0.01], [-HW * 0.5, HH - 0.04, depth + 0.17],
-                  [0, HH - 0.07, depth + 0.21], [HW * 0.5, HH - 0.04, depth + 0.17],
-                  [HW, HH - 0.02, depth + 0.01]], T, rim, 40));
-      g.add(pipe([[-HW, HH - 0.02, -depth - 0.01], [-HW * 0.5, HH - 0.04, -depth - 0.17],
-                  [0, HH - 0.07, -depth - 0.21], [HW * 0.5, HH - 0.04, -depth - 0.17],
-                  [HW, HH - 0.02, -depth - 0.01]], T, rim, 40));
+      // ── 黑色细包边：袋口一圈 + 四条竖棱 + 底边一圈 ──
+      var rim = 0.034;
+      var topZ = depth + 0.16;
+      // 袋口前后沿（接近平直）
+      g.add(pipe([[-HW, HH - 0.02, depth + 0.01], [0, HH - 0.04, topZ],
+                  [HW, HH - 0.02, depth + 0.01]], T, rim, 32));
+      g.add(pipe([[-HW, HH - 0.02, -depth - 0.01], [0, HH - 0.04, -topZ],
+                  [HW, HH - 0.02, -depth - 0.01]], T, rim, 32));
       // 左右袋口沿
       [-1, 1].forEach(function (sgn) {
-        g.add(pipe([[sgn * HW, HH - 0.02, depth + 0.01], [sgn * HW, HH - 0.05, 0],
+        g.add(pipe([[sgn * HW, HH - 0.02, depth + 0.01], [sgn * HW, HH - 0.04, 0],
                     [sgn * HW, HH - 0.02, -depth - 0.01]], T, rim, 24));
       });
-      // 四条竖棱
+      // 四条竖棱（跟随上宽下收）
       [-1, 1].forEach(function (sx) {
         [-1, 1].forEach(function (sz) {
-          g.add(pipe([[sx * HW, HH - 0.02, sz * (depth + 0.02)],
-                      [sx * HW, 0, sz * (depth + 0.02)],
-                      [sx * HW, -HH + 0.02, sz * (depth + 0.02)]], T, rim, 20));
+          g.add(pipe([[sx * halfWidthAt(1), HH - 0.02, sz * (depth + 0.02)],
+                      [sx * halfWidthAt(0.5), 0, sz * (depth + 0.02)],
+                      [sx * halfWidthAt(0), -HH + 0.02, sz * (depth + 0.02)]], T, rim, 20));
         });
       });
       // 底边前后沿
       [1, -1].forEach(function (sz) {
-        g.add(pipe([[-HW, -HH + 0.03, sz * (depth + 0.02)],
+        g.add(pipe([[-halfWidthAt(0), -HH + 0.03, sz * (depth + 0.02)],
                     [0, -HH + 0.03, sz * (depth + 0.02)],
-                    [HW, -HH + 0.03, sz * (depth + 0.02)]], T, rim, 24));
+                    [halfWidthAt(0), -HH + 0.03, sz * (depth + 0.02)]], T, rim, 24));
       });
-      // ── 黑色织带提手：两条扁平带跨过包口，根部延伸到前片内侧（贴合原型） ──
-      [-0.42, 0.42].forEach(function (x) {
-        var hp = [[x - 0.3, HH - 0.28, 0.06], [x - 0.3, HH + 0.5, 0],
-                  [x - 0.2, HH + 0.92, 0], [x, HH + 1.04, 0],
-                  [x + 0.2, HH + 0.92, 0], [x + 0.3, HH + 0.5, 0],
-                  [x + 0.3, HH - 0.28, 0.06]];
-        var h = pipe(hp, T, 0.098, 48);
-        h.scale.z = 0.32; // 压成扁带
+      // ── 黑色织带提手：两条扁平带跨过包口，根部顺着前片向下延伸（对照参考） ──
+      [-0.36, 0.36].forEach(function (x) {
+        // 提手整体：从袋口内侧向上拱起；两侧下降段直接延伸到前片表面（根部即缝片，避免分离的黑块）
+        var hp = [[x - 0.24, HH - 0.5, depth * 0.55 + 0.1], [x - 0.24, HH - 0.1, depth * 0.6 + 0.06],
+                  [x - 0.22, HH + 0.55, 0.03], [x - 0.14, HH + 0.98, 0], [x, HH + 1.08, 0],
+                  [x + 0.14, HH + 0.98, 0], [x + 0.22, HH + 0.55, 0.03],
+                  [x + 0.24, HH - 0.1, depth * 0.6 + 0.06], [x + 0.24, HH - 0.5, depth * 0.55 + 0.1]];
+        var h = pipe(hp, T, 0.088, 56);
+        h.scale.z = 0.38; // 压成扁带
         g.add(h);
+        // 缝片底端一道横向车线（浅色，暗示缝合）
+        g.add(mesh(new THREE.BoxGeometry(0.14, 0.022, 0.02), A, x - 0.24, HH - 0.48, depth * 0.55 + 0.14));
+        g.add(mesh(new THREE.BoxGeometry(0.14, 0.022, 0.02), A, x + 0.24, HH - 0.48, depth * 0.55 + 0.14));
       });
-      return { group: g, shadowY: -1.36, shadowR: 1.45 };
+      // ── 正面品牌皮标（参考模型标志性细节）：位于两条提手之间的下方，避开缝片 ──
+      var tagW = 0.42, tagH = 0.19, tagZ = depth * 0.78 + 0.12, tagY = HH - 0.78;
+      g.add(mesh(new THREE.BoxGeometry(tagW + 0.035, tagH + 0.035, 0.02), A, 0, tagY, tagZ - 0.012));
+      g.add(mesh(new THREE.BoxGeometry(tagW, tagH, 0.03), T, 0, tagY, tagZ));
+      // 皮标上的三道压纹横线（暗示文字，避免生硬纯色块）
+      [-0.045, 0, 0.045].forEach(function (dy) {
+        g.add(mesh(new THREE.BoxGeometry(0.26, 0.011, 0.01), A, 0, tagY + dy, tagZ + 0.02));
+      });
+      return { group: g, shadowY: -1.5, shadowR: 1.45 };
 
     } else if (pid === 'tee') {
       // T恤（v10 高精度）：立体衣身 + 肩线塑形 + 挖低圆领 + 圆锥短袖 + 罗纹。
