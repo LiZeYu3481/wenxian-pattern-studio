@@ -262,51 +262,17 @@
       g.add(mesh(new THREE.TorusGeometry(FR, 0.035, 10, 80), C, 0, 0.34, 0));
       // 内描边细圈
       g.add(mesh(new THREE.TorusGeometry(FR * 0.955, 0.008, 8, 80), D, 0, 0.34, 0.04));
-      // 扇柄（原木色圆柱），从扇面下缘向下
-      g.add(mesh(new THREE.CylinderGeometry(0.065, 0.078, 1.15, 18), C, 0, -0.63, 0));
-      // 柄头收尾
-      g.add(mesh(new THREE.SphereGeometry(0.085, 16, 12), C, 0, -1.21, 0));
-      // 柄与扇面连接箍
-      g.add(mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.12, 18), D, 0, -0.95, 0));
-      // 扇穗：柄尾垂下一束丝线
-      for (var fk = -4; fk <= 4; fk++) {
-        var fx0 = fk * 0.018;
-        g.add(pipe([[fx0, -1.26, 0], [fx0 * 1.4, -1.5, 0.01], [fx0 * 1.8 + Math.sin(fk) * 0.02, -1.72, 0]],
-          fk % 2 === 0 ? T : C, 0.011, 10));
-      }
-      return { group: g, shadowY: -1.78, shadowR: 1.5 };
-    } else if (pid === 'shawl') {
-      var SW2 = 3.9, SH2 = 1.9;
-      function shawlZ(u, v) {
-        var px = (u - 0.5) * SW2, py = (v - 0.5) * SH2;
-        var ex = Math.abs(u - 0.5) * 2;
-        // 柔软垂坠大波浪 + 边缘微卷
-        return 0.16 * Math.sin(px * 0.95 + 0.5) * Math.cos(py * 0.8)
-             + 0.07 * Math.sin(py * 1.8 - px * 0.4)
-             + 0.1 * Math.pow(ex, 4) * Math.sin(py * 2.2 + 0.3);
-      }
-      // 正面满印
-      g.add(gridMesh(56, 30, function (v, u) {
-        return [(u - 0.5) * SW2, (v - 0.5) * SH2, shawlZ(u, v), u, v];
-      }, F));
-      // 背面满印（反面 UV 水平翻转）
-      g.add(gridMesh(56, 30, function (v, u) {
-        return [(u - 0.5) * SW2, (v - 0.5) * SH2, shawlZ(u, v) - 0.035, 1 - u, v];
-      }, B));
-      // 两端流苏：短边外伸，成束细线
-      for (var sk = -18; sk <= 18; sk++) {
-        var sx = sk * (SW2 - 0.2) / 36;
-        [-1, 1].forEach(function (sgn) {
-          var edgeY = sgn * SH2 / 2;
-          var sway = 0.03 * Math.sin(sk * 2.1 + sgn);
-          g.add(pipe([
-            [sx, edgeY, shawlZ((sx / SW2) + 0.5, sgn > 0 ? 1 : 0)],
-            [sx + sway * 0.5, edgeY + sgn * 0.18, 0.08],
-            [sx + sway, edgeY + sgn * 0.34, 0.04]
-          ], C, 0.008, 10));
-        });
-      }
-      return { group: g, shadowY: -0.42, shadowR: 2.0 };
+      // v27：深棕木质手柄（不再是细线条流苏），从扇面内一直延伸到柄尾。
+      // 削肩圆柱 + 金色装饰箍 + 圆弧柄尾，呈现真实木质团扇握柄质感。
+      g.add(mesh(new THREE.CylinderGeometry(0.072, 0.09, 1.62, 20), W, 0, -1.42, 0));
+      // 柄与扇面连接处的加粗木箍
+      g.add(mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.16, 20), W, 0, -0.82, 0));
+      // 握柄中段金色装饰箍
+      g.add(mesh(new THREE.CylinderGeometry(0.094, 0.094, 0.045, 20), A, 0, -1.5, 0));
+      g.add(mesh(new THREE.CylinderGeometry(0.096, 0.096, 0.03, 20), A, 0, -1.94, 0));
+      // 圆弧柄尾收口
+      g.add(mesh(new THREE.SphereGeometry(0.09, 18, 14), W, 0, -2.24, 0));
+      return { group: g, shadowY: -2.35, shadowR: 1.4 };
     } else if (pid === 'vase') {
       // 陶瓷花瓶母线：底 -> 腹 -> 肩 -> 颈 -> 口沿
       var pts = [
@@ -333,74 +299,115 @@
       // 方巾（v22 对照 6 张参考重做）：约 1:1.85 长方形真丝巾，平滑连续大波浪褶皱，
       // 边缘自然微卷、双面印花、极薄无实心底板（参考为 beach_towel 式柔软丝绸布面）。
       if (pid === 'scarf') {
-        var SW = 1.85, SH = 3.4;
-        function silkZ(u, v) {
-          var px = (u - 0.5) * SW, py = (v - 0.5) * SH;
-          var ex = Math.abs(u - 0.5) * 2, ey = Math.abs(v - 0.5) * 2;
-          // 主体：沿长边的平滑大波浪（约 3 个波峰）+ 横向缓坡交叉起伏
-          var wave = 0.22 * Math.sin(py * 1.5 + 0.4) * Math.cos(px * 0.8)
-                   + 0.12 * Math.sin(px * 2.1 - py * 0.5);
-          // 边缘微卷：四边振幅逐渐增大，形成柔软丝绸的卷边
-          var curl = 0.16 * Math.pow(ex, 5) * Math.sin(py * 1.9 + 0.8)
-                   + 0.12 * Math.pow(ey, 5) * Math.sin(px * 2.3 - 0.3);
-          return wave + curl;
+        // v27 按 5 张参考图重做：真丝围巾 = 多层缠绕的环形围脖 + 从环内垂下的柔软飘带，
+        // 双面满印纹样、布料柔褶。中空圆环用内外双层柱面 + 上下卷边，飘带沿 S 形曲线下垂。
+        var NR = 1.28, NH = 0.92;        // 围脖半径 / 带宽
+        var neckY = 1.15;                // 围脖中心高度
+
+        // —— 环形围脖：绕 Y 轴的圆筒，外壁 + 内壁 + 上下翻边，做出 2~3 层缠绕褶皱 ——
+        function ringPoint(theta, t, layer) {
+          // theta 0..2PI 环向, t 0..1 沿带宽（下→上）, layer 0外 1内
+          var rr = NR + (layer === 0 ? 0 : -0.11);
+          // 缠绕层次：沿环向做低频起伏，形成叠层褶皱的凹凸
+          var fold = 0.045 * Math.sin(theta * 5.0 + t * 2.2)
+                   + 0.03 * Math.sin(theta * 9.0 - t * 3.1);
+          rr += fold;
+          var y = neckY + (t - 0.5) * NH + 0.05 * Math.sin(theta * 4.0 + t * 1.5);
+          return [rr * Math.cos(theta), y, rr * Math.sin(theta)];
         }
-        g.add(gridMesh(56, 64, function (v, u) {
-          return [(u - 0.5) * SW, (v - 0.5) * SH, silkZ(u, v), u, v];
+        // 外壁（正面纹样）
+        g.add(gridMesh(72, 16, function (v, u) {
+          var th = u * Math.PI * 2;
+          var P = ringPoint(th, v, 0);
+          return [P[0], P[1], P[2], u, v];
         }, F));
-        g.add(gridMesh(56, 64, function (v, u) {
-          return [(u - 0.5) * SW, (v - 0.5) * SH, silkZ(u, v) - 0.03, 1 - u, v];
+        // 内壁（背面纹样，UV 翻转）
+        g.add(gridMesh(72, 16, function (v, u) {
+          var th = u * Math.PI * 2;
+          var P = ringPoint(th, v, 1);
+          return [P[0], P[1], P[2], 1 - u, v];
         }, B));
-        // 极细窄卷边：贴着边缘起伏，不再是生硬粗滚边
-        var edge = [];
-        for (var e = 0; e <= 128; e++) {
-          var t = e / 128, seg = Math.floor(t * 4), f = t * 4 - seg;
-          var uu, vv;
-          if (seg === 0) { uu = f; vv = 0; }
-          else if (seg === 1) { uu = 1; vv = f; }
-          else if (seg === 2) { uu = 1 - f; vv = 1; }
-          else { uu = 0; vv = 1 - f; }
-          edge.push([(uu - 0.5) * SW, (vv - 0.5) * SH, silkZ(uu, vv) - 0.008]);
+        // 上下翻边（把内外壁在带边缘连起来，形成有厚度的布环口）
+        [0, 1].forEach(function (top) {
+          var tv = top ? 1 : 0;
+          g.add(gridMesh(72, 4, function (v, u) {
+            var th = u * Math.PI * 2;
+            var Po = ringPoint(th, tv, 0), Pi = ringPoint(th, tv, 1);
+            var x = Po[0] + (Pi[0] - Po[0]) * v;
+            var y = Po[1] + (Pi[1] - Po[1]) * v + (top ? 0.02 : -0.02) * Math.sin(v * Math.PI);
+            var z = Po[2] + (Pi[2] - Po[2]) * v;
+            return [x, y, z, u, v];
+          }, top ? F : B));
+        });
+
+        // —— 垂下飘带：从围脖前侧(theta≈PI/2, 即 +Z 朝前)垂下，S 形弯曲 + 柔褶 ——
+        var SW2 = 0.82, SL = 2.85;
+        function drapePoint(u, v) {
+          // u 0..1 带宽, v 0..1 从环口向下
+          var x = (u - 0.5) * SW2;
+          var drop = v * SL;
+          var y = neckY - 0.15 - drop;
+          // 飘带向前下方自然摆动 + 轻微左右 S 弯
+          var z = 0.22 + 0.16 * Math.sin(v * Math.PI * 0.9)
+                + 0.1 * v + 0.05 * Math.sin(u * Math.PI * 2 + v * 3.0);
+          x += 0.14 * Math.sin(v * Math.PI * 1.2) + 0.06 * Math.sin(v * 5.0);
+          // 布面柔褶：横向波纹随下垂逐渐平缓
+          z += 0.045 * Math.sin(u * Math.PI * 4.0) * (1 - 0.5 * v);
+          return [x, y, z];
         }
-        g.add(pipe(edge, C, 0.012, 192));
-        return { group: g, shadowY: -0.78, shadowR: 1.95 };
-      }
-      // 地毯（v22 对照 6 张参考重做）：约 3:1 宽幅薄毯、表面柔软起伏、短边微卷，
-      // 两端各一排成束流苏（参考为细密浅色线穗，扁平略卷）。
-      var rw = 4.4, rh = 1.62;
-      // 毯面：极薄柔软，短边微卷，带低频自然褶皱
-      g.add(gridMesh(48, 24, function (v, u) {
-        var px = (u - 0.5) * rw, py = (v - 0.5) * rh;
-        var edgeY = Math.abs(v - 0.5) * 2;
-        var ripple = 0.035 * Math.sin(px * 1.4 + py * 0.9) * Math.cos(py * 1.7 - px * 0.5)
-                   + 0.02 * Math.sin((px + py) * 2.4);
-        var curl = 0.06 * Math.pow(edgeY, 4) * Math.sin(px * 2.2 + 0.6);
-        return [px, py, 0.06 + ripple + curl, u, v];
-      }, F));
-      // 薄毯芯 + 底面印花（v26 修复俯视空白：毯芯整体下沉到起伏毯面之下，
-      // 顶面 z=-0.02 低于毯面最低点≈0.005，杜绝纯色毯芯穿透印花面）
-      g.add(mesh(new THREE.BoxGeometry(rw * 0.99, rh * 0.985, 0.03), D, 0, -0.035, 0));
-      g.add(gridMesh(48, 24, function (v, u) {
-        return [(u - 0.5) * rw, (v - 0.5) * rh, -0.062, 1 - u, v];
-      }, B));
-      // 流苏：两端短边各 25 束，每束 3 股细线，自然外伸微卷
-      for (var k = -12; k <= 12; k++) {
-        var fx = k * (rw - 0.3) / 24;
-        [-1, 1].forEach(function (sgn) {
-          var jit = Math.sin(k * 11.3 + sgn * 4.7);
-          for (var strand = -1; strand <= 1; strand++) {
-            var sx = fx + strand * 0.018;
-            var len = 0.22 + 0.1 * Math.abs(jit);
-            var sway = 0.045 * Math.sin(k * 3.1 + strand * 2.3 + sgn);
-            g.add(pipe([
-              [sx, sgn * (rh / 2 - 0.01), 0.06],
-              [sx + sway * 0.5, sgn * (rh / 2 + len * 0.45), 0.07],
-              [sx + sway, sgn * (rh / 2 + len), 0.055 + strand * 0.012]
-            ], C, 0.009, 12));
+        g.add(gridMesh(20, 48, function (v, u) {
+          var P = drapePoint(u, v);
+          return [P[0], P[1], P[2], u, v];
+        }, F));
+        g.add(gridMesh(20, 48, function (v, u) {
+          var P = drapePoint(u, v);
+          return [P[0], P[1], P[2] - 0.022, 1 - u, v];
+        }, B));
+        // 飘带两侧细卷边
+        [0, 1].forEach(function (edgeU) {
+          var pts = [];
+          for (var e = 0; e <= 40; e++) {
+            var vv = e / 40, P = drapePoint(edgeU, vv);
+            pts.push([P[0], P[1], P[2] - 0.005]);
           }
+          g.add(pipe(pts, C, 0.01, 64));
+        });
+        return { group: g, shadowY: -1.95, shadowR: 1.6 };
+      }
+            // 地毯（v27：按用户反馈改用披肩同款造型）——约 2:1 长方形柔软布毯，
+      // 大波浪垂坠起伏 + 边缘微卷 + 两端成束流苏，正背双面满印。
+      // 不设实心毯芯（避免起伏面穿透露出纯色块的俯视空白问题）。
+      var rw = 3.9, rh = 1.95;
+      function rugZ(u, v) {
+        var px = (u - 0.5) * rw, py = (v - 0.5) * rh;
+        var ex = Math.abs(u - 0.5) * 2;
+        return 0.16 * Math.sin(px * 0.95 + 0.5) * Math.cos(py * 0.8)
+             + 0.07 * Math.sin(py * 1.8 - px * 0.4)
+             + 0.1 * Math.pow(ex, 4) * Math.sin(py * 2.2 + 0.3);
+      }
+      // 正面满印
+      g.add(gridMesh(56, 30, function (v, u) {
+        return [(u - 0.5) * rw, (v - 0.5) * rh, rugZ(u, v), u, v];
+      }, F));
+      // 背面满印（反面 UV 水平翻转）
+      g.add(gridMesh(56, 30, function (v, u) {
+        return [(u - 0.5) * rw, (v - 0.5) * rh, rugZ(u, v) - 0.035, 1 - u, v];
+      }, B));
+      // 两端短边流苏：成束细线外伸微卷
+      for (var sk = -18; sk <= 18; sk++) {
+        var sx = sk * (rw - 0.2) / 36;
+        [-1, 1].forEach(function (sgn) {
+          var edgeY = sgn * rh / 2;
+          var sway = 0.03 * Math.sin(sk * 2.1 + sgn);
+          g.add(pipe([
+            [sx, edgeY, rugZ((sx / rw) + 0.5, sgn > 0 ? 1 : 0)],
+            [sx + sway * 0.5, edgeY + sgn * 0.18, 0.08],
+            [sx + sway, edgeY + sgn * 0.34, 0.04]
+          ], C, 0.008, 10));
         });
       }
-      return { group: g, shadowY: -0.28, shadowR: rw / 2 };
+      return { group: g, shadowY: -0.55, shadowR: rw / 2 };
+
     } else if (pid === 'mug') {
       // 马克杯（v10）：杯身印花、加厚圆润口沿、内壁/杯底深色内衬、C 形把手从侧面伸出。
       var mugBody = new THREE.CylinderGeometry(0.95, 0.84, 2.1, 56, 1, true);
@@ -624,27 +631,71 @@
       g.add(handle);
       return { group: g, shadowY: -2.4, shadowR: 1.85 };
     } else if (pid === 'fan') {
-      // 折扇（用户认可，保持不变）：细分扇面折痕起伏，扇骨移到纸背后，正背都有纹样。
-      var FR = 2.7, fcy = -1.55, a0 = Math.PI * 0.19, a1 = Math.PI * 0.81;
-      g.add(gridMesh(48, 12, function (v, u) {
-        var a = a0 + (a1 - a0) * u, rr = FR * v;
-        var zz = 0.06 * Math.sin(u * Math.PI * 10);
-        return [rr * Math.cos(a), fcy + rr * Math.sin(a), zz, u, v];
-      }, F));
-      // 扇骨：11 根竹骨，扇面背后放射排布；外侧两根大骨更粗更长
-      for (var t = 0; t <= 10; t++) {
-        var ang = a0 + (a1 - a0) * t / 10;
-        var isEdge = (t === 0 || t === 10);
-        var bl = FR * (isEdge ? 1.0 : 0.94);
-        var bw = isEdge ? 0.055 : 0.032;
-        g.add(mesh(new THREE.BoxGeometry(bl, bw, bw), W,
-          bl * 0.5 * Math.cos(ang), fcy + bl * 0.5 * Math.sin(ang), -0.075,
-          0, 0, ang));
+      // v27 按 18 张真实折扇参考重做：
+      // 米白折面（每折独立梯形、山折谷折交替、外缘锯齿尖角）
+      // + 13 根深棕木骨从金扇钉放射 + 外缘两根圆弧大骨 + 扇面只覆盖外段露出内圈骨架。
+      var FR = 2.72, fcy = -1.5;
+      var a0 = Math.PI * 0.13, a1 = Math.PI * 0.87;
+      var span = a1 - a0;
+      var FOLDS = 13;            // 折数（14 根骨）
+      var rIn = 1.16;            // 扇面内缘：内圈露骨架
+      var foldAmp = 0.13;        // 折痕起伏振幅
+
+      // 折面 z：每折内三角波（中心凸起、折缝回落），相邻折凹凸交替
+      function foldWave(u) {
+        var p = u * FOLDS;
+        var f = p - Math.floor(p);
+        var tri = f < 0.5 ? (f * 2) : (2 - f * 2);
+        var sgn = (Math.floor(p) % 2 === 0) ? 1 : -1;
+        return sgn * tri * foldAmp;
       }
-      // 扇钉 + 尾部流苏装饰
-      g.add(mesh(new THREE.SphereGeometry(0.11, 14, 10), A, 0, fcy, -0.1));
-      g.add(pipe([[0, fcy - 0.1, -0.1], [0.04, fcy - 0.35, -0.06], [0.02, fcy - 0.55, -0.02]], A, 0.02, 16));
-      return { group: g, shadowY: -1.85, shadowR: 1.4 };
+      // 外缘半径：折中心尖角最长，折缝略短，形成锯齿山峰
+      function outerR(u) {
+        var p = u * FOLDS;
+        var f = p - Math.floor(p);
+        var tri = f < 0.5 ? (f * 2) : (2 - f * 2);
+        return FR * (0.93 + 0.07 * tri);
+      }
+      // 折面本体（正面纹样 F / 背面纹样 B），u=角度向，v=半径向
+      g.add(gridMesh(130, 14, function (v, u) {
+        var a = a0 + span * u;
+        var ro = outerR(u);
+        var r = rIn + (ro - rIn) * v;
+        var z = foldWave(u) * (0.35 + 0.65 * v);
+        return [r * Math.cos(a), fcy + r * Math.sin(a), z, u, v];
+      }, F));
+      g.add(gridMesh(130, 14, function (v, u) {
+        var a = a0 + span * u;
+        var ro = outerR(u);
+        var r = rIn + (ro - rIn) * v;
+        var z = foldWave(u) * (0.35 + 0.65 * v);
+        return [r * Math.cos(a), fcy + r * Math.sin(a), z - 0.014, 1 - u, v];
+      }, B));
+
+      // 14 根深棕木骨从金扇钉放射，扇面背后；外侧两根大骨更粗更长、圆弧末端
+      for (var t = 0; t <= FOLDS; t++) {
+        var ang = a0 + span * t / FOLDS;
+        var isEdge = (t === 0 || t === FOLDS);
+        var bl = isEdge ? FR * 1.02 : FR * 0.985;
+        var bw = isEdge ? 0.062 : 0.03;
+        g.add(mesh(new THREE.BoxGeometry(bl, bw, bw * 0.8), W,
+          bl * 0.5 * Math.cos(ang), fcy + bl * 0.5 * Math.sin(ang), -0.062,
+          0, 0, ang));
+        // 大骨末端圆弧收口
+        if (isEdge) {
+          g.add(mesh(new THREE.SphereGeometry(bw * 0.62, 12, 10), W,
+            bl * Math.cos(ang), fcy + bl * Math.sin(ang), -0.062));
+        }
+      }
+      // 扇面内缘压边（沿 rIn 的细弧），遮住扇面与骨架接缝
+      g.add(gridMesh(60, 1, function (v, u) {
+        var a = a0 + span * u;
+        return [(rIn - 0.02) * Math.cos(a), fcy + (rIn - 0.02) * Math.sin(a), 0.012, u, v];
+      }, D));
+      // 金扇钉 + 扇钉两侧叠合的大骨轴
+      g.add(mesh(new THREE.SphereGeometry(0.105, 16, 12), A, 0, fcy, -0.085));
+      g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 12), A, 0, fcy, -0.085, Math.PI / 2, 0, 0));
+      return { group: g, shadowY: -1.85, shadowR: 1.5 };
 
     } else if (pid === 'hat') {
       // 渔夫帽（精修）：帽冠 + 帽檐 + 帽壁所有外露面积全部铺满纹样；只有内腔用深色（用户允许内部不填充）。
@@ -788,7 +839,7 @@
       backMat: new THREE.MeshStandardMaterial({ color: 0xdbcfb8, roughness: 0.96, metalness: 0, side: ds, envMapIntensity: 0.28 }),
       innerMat: new THREE.MeshStandardMaterial({ color: 0xaa9e88, roughness: 0.94, metalness: 0, side: ds, envMapIntensity: 0.24 }),
       fabricMat: new THREE.MeshStandardMaterial({ color: 0xcfc2a8, roughness: 0.97, metalness: 0, side: ds, envMapIntensity: 0.28 }),
-      woodMat: new THREE.MeshStandardMaterial({ color: 0x6a4b32, roughness: 0.8, metalness: 0, envMapIntensity: 0.4 }),
+      woodMat: new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 0.72, metalness: 0, envMapIntensity: 0.18 }),
       accentMat: new THREE.MeshStandardMaterial({ color: 0xb79468, roughness: 0.28, metalness: 0.85, envMapIntensity: 1.1 }),
       // 托特包专用：黑色包边/织带（固定深色，不随配色变），帆布哑光。
       trimMat: new THREE.MeshStandardMaterial({ color: 0x12100f, roughness: 0.92, metalness: 0, side: ds, envMapIntensity: 0.18 }),
@@ -1104,9 +1155,35 @@
     });
   }
 
+  // v27 可交互 3D 导出：序列化当前场景几何 + 纹样贴图 dataUrl，
+  // 供 main bundle 拼装成自包含 HTML（内嵌 Three.js + ObjectLoader + 轨道控制）。
+  function exportScene() {
+    if (!S.ready || !S.group || !S.renderer) return null;
+    try {
+      var json = S.group.toJSON();
+      var artUrl = null;
+      try {
+        var o = S.opts || {};
+        artUrl = buildArtDataUrl(o.svgRef && o.svgRef.current, o.baseHex);
+      } catch (e) { artUrl = null; }
+      // 若当前纹理已加载，直接用它的 image 作为后备
+      if (!artUrl && S.tex && S.tex.image && S.tex.image.src) artUrl = S.tex.image.src;
+      return {
+        json: json,
+        artUrl: artUrl,
+        productId: S.productId || '',
+        title: (S.opts && S.opts.title) || ''
+      };
+    } catch (e) {
+      console.error('[exportScene] failed', e);
+      return null;
+    }
+  }
+
   window.Wx3D = {
     init: init, update: update, dispose: dispose, view: view,
     buildArtDataUrl: buildArtDataUrl,
-    captureView: captureView, captureThreeViews: captureThreeViews
+    captureView: captureView, captureThreeViews: captureThreeViews,
+    exportScene: exportScene
   };
 })();
