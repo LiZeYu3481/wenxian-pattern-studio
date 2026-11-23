@@ -60,7 +60,7 @@
   var S = {
     host: null, renderer: null, scene: null, camera: null, group: null,
     frontMat: null, backMat: null, sideMat: null, innerMat: null,
-    fabricMat: null, woodMat: null, accentMat: null,
+    fabricMat: null, woodMat: null, accentMat: null, trimMat: null,
     target: { rx: -0.08, ry: -0.32 }, drag: false, lx: 0, ly: 0,
     raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null
   };
@@ -244,55 +244,84 @@
   function buildProduct(pid, M) {
     var g = new THREE.Group();
     var W = M.woodMat, A = M.accentMat, F = M.frontMat, B = M.backMat,
-        D = M.sideMat, I = M.innerMat, C = M.fabricMat;
+        D = M.sideMat, I = M.innerMat, C = M.fabricMat, T = M.trimMat;
 
     if (pid === 'tote') {
-      // 托特包（v10 高精度）：鼓起的立体袋身 + 内凹袋口（深色内里）+ 两条扁带提手 + 铆钉。
-      // 袋身用参数化曲面做出中间凸、边缘收的布包体积，不再是一块平板挤出。
-      var HW = 1.22, HH = 1.18, depth = 0.42;
-      // 前片：中央外鼓 (z+)，四角收
+      // 托特包（v15 按真实黑色包边帆布托特包重做）：
+      // 参照原型——黑色包边 + 黑色织带提手 + 印花帆布铺满正/侧/底 + 方正厚实软包 + 可见深色内里。
+      // 最大改动：侧面/底面从纯色 D 改为印花 F，消除"白色纸袋"观感。
+      var HW = 1.24, HH = 1.16, depth = 0.4;
+      // 前片：中央轻微外鼓，四角收，UV 铺满
       g.add(gridMesh(28, 28, function (v, u) {
         var px = (u - 0.5) * 2 * HW, py = (v - 0.5) * 2 * HH;
         var bulge = depth * Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
         return [px, py, bulge, u, v];
       }, F));
-      // 后片：同样外鼓 (z-) —— 背面也有印花
+      // 后片：同样印花外鼓
       g.add(gridMesh(28, 28, function (v, u) {
         var px = (u - 0.5) * 2 * HW, py = (v - 0.5) * 2 * HH;
         var bulge = depth * Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
         return [px, py, -bulge - 0.05, 1 - u, v];
-      }, B));
-      // 左右侧片 + 底片（纯色包边），把前后片连成闭合布包
+      }, F));
+      // 左右侧片：改印花 F（关键），横向 UV 压缩避免纹样被拉长
       [-1, 1].forEach(function (sgn) {
-        g.add(gridMesh(6, 20, function (v, u) {
+        g.add(gridMesh(8, 24, function (v, u) {
           var py = (v - 0.5) * 2 * HH;
           var zz = (u - 0.5) * (2 * depth + 0.05);
           var edge = Math.sin(Math.PI * v);
-          return [sgn * (HW - 0.04 * edge), py, zz, u, v];
-        }, D));
+          return [sgn * (HW - 0.03 * edge), py, zz, u * 0.42, v];
+        }, F));
       });
-      g.add(gridMesh(20, 6, function (v, u) {
+      // 底片：也铺印花，杜绝任何纯色白块
+      g.add(gridMesh(20, 8, function (v, u) {
         var px = (u - 0.5) * 2 * HW;
         var zz = (v - 0.5) * (2 * depth + 0.05);
         return [px, -HH + 0.03, zz, u, v];
-      }, D));
-      // 袋口：顶部内凹深色内里（俯视能看到开口），前沿略低于后沿
+      }, F));
+      // 袋口：顶部内凹深色内里（俯视能看到开口）
       g.add(gridMesh(28, 8, function (v, u) {
-        var px = (u - 0.5) * 2 * (HW - 0.03);
-        var zz = (v - 0.5) * (2 * depth - 0.06);
-        var yy = HH - 0.06 - 0.12 * Math.sin(Math.PI * u);
+        var px = (u - 0.5) * 2 * (HW - 0.04);
+        var zz = (v - 0.5) * (2 * depth - 0.04);
+        var yy = HH - 0.07 - 0.11 * Math.sin(Math.PI * u);
         return [px, yy, zz, u, v];
       }, I));
-      // 提手（v14）：收细扁带，降低拱高，避免旧版像粗白色塑料环。
-      [-0.26, 0.26].forEach(function (z) {
-        var hp = [[-0.78, 1.12, z], [-0.79, 1.76, z], [-0.5, 2.12, z],
-                  [0, 2.24, z], [0.5, 2.12, z], [0.79, 1.76, z], [0.78, 1.12, z]];
-        var h = pipe(hp, C, 0.088, 48);
-        h.scale.z = 0.3;
-        g.add(h);
-        [-0.78, 0.78].forEach(function (x) {
-          g.add(mesh(new THREE.SphereGeometry(0.065, 12, 8), A, x, 1.16, z));
+      // ── 黑色包边（原型灵魂）：袋口一圈 + 四条竖棱 + 底边一圈，用黑色细管走线 ──
+      var rim = 0.042;
+      // 袋口前后沿（跟随前片鼓起的肩线）
+      g.add(pipe([[-HW, HH - 0.02, depth + 0.01], [-HW * 0.5, HH - 0.04, depth + 0.17],
+                  [0, HH - 0.07, depth + 0.21], [HW * 0.5, HH - 0.04, depth + 0.17],
+                  [HW, HH - 0.02, depth + 0.01]], T, rim, 40));
+      g.add(pipe([[-HW, HH - 0.02, -depth - 0.01], [-HW * 0.5, HH - 0.04, -depth - 0.17],
+                  [0, HH - 0.07, -depth - 0.21], [HW * 0.5, HH - 0.04, -depth - 0.17],
+                  [HW, HH - 0.02, -depth - 0.01]], T, rim, 40));
+      // 左右袋口沿
+      [-1, 1].forEach(function (sgn) {
+        g.add(pipe([[sgn * HW, HH - 0.02, depth + 0.01], [sgn * HW, HH - 0.05, 0],
+                    [sgn * HW, HH - 0.02, -depth - 0.01]], T, rim, 24));
+      });
+      // 四条竖棱
+      [-1, 1].forEach(function (sx) {
+        [-1, 1].forEach(function (sz) {
+          g.add(pipe([[sx * HW, HH - 0.02, sz * (depth + 0.02)],
+                      [sx * HW, 0, sz * (depth + 0.02)],
+                      [sx * HW, -HH + 0.02, sz * (depth + 0.02)]], T, rim, 20));
         });
+      });
+      // 底边前后沿
+      [1, -1].forEach(function (sz) {
+        g.add(pipe([[-HW, -HH + 0.03, sz * (depth + 0.02)],
+                    [0, -HH + 0.03, sz * (depth + 0.02)],
+                    [HW, -HH + 0.03, sz * (depth + 0.02)]], T, rim, 24));
+      });
+      // ── 黑色织带提手：两条扁平带跨过包口，根部延伸到前片内侧（贴合原型） ──
+      [-0.42, 0.42].forEach(function (x) {
+        var hp = [[x - 0.3, HH - 0.28, 0.06], [x - 0.3, HH + 0.5, 0],
+                  [x - 0.2, HH + 0.92, 0], [x, HH + 1.04, 0],
+                  [x + 0.2, HH + 0.92, 0], [x + 0.3, HH + 0.5, 0],
+                  [x + 0.3, HH - 0.28, 0.06]];
+        var h = pipe(hp, T, 0.098, 48);
+        h.scale.z = 0.32; // 压成扁带
+        g.add(h);
       });
       return { group: g, shadowY: -1.36, shadowR: 1.45 };
 
@@ -820,7 +849,9 @@
       innerMat: new THREE.MeshStandardMaterial({ color: 0xaa9e88, roughness: 0.94, metalness: 0, side: ds, envMapIntensity: 0.24 }),
       fabricMat: new THREE.MeshStandardMaterial({ color: 0xcfc2a8, roughness: 0.97, metalness: 0, side: ds, envMapIntensity: 0.28 }),
       woodMat: new THREE.MeshStandardMaterial({ color: 0x6a4b32, roughness: 0.8, metalness: 0, envMapIntensity: 0.4 }),
-      accentMat: new THREE.MeshStandardMaterial({ color: 0xb79468, roughness: 0.28, metalness: 0.85, envMapIntensity: 1.1 })
+      accentMat: new THREE.MeshStandardMaterial({ color: 0xb79468, roughness: 0.28, metalness: 0.85, envMapIntensity: 1.1 }),
+      // 托特包专用：黑色包边/织带（固定深色，不随配色变），帆布哑光。
+      trimMat: new THREE.MeshStandardMaterial({ color: 0x12100f, roughness: 0.92, metalness: 0, side: ds, envMapIntensity: 0.18 })
     };
 
     // 陶瓷（马克杯/瓷盘）：哑光釉面 roughness≈0.75（网络规范 0.7–0.9），非塑料高光。
@@ -901,7 +932,7 @@
     S.host = host; S.renderer = renderer; S.scene = scene; S.camera = camera;
     S.group = group; S.frontMat = M.frontMat; S.backMat = M.backMat;
     S.sideMat = M.sideMat; S.innerMat = M.innerMat; S.fabricMat = M.fabricMat;
-    S.woodMat = M.woodMat; S.accentMat = M.accentMat;
+    S.woodMat = M.woodMat; S.accentMat = M.accentMat; S.trimMat = M.trimMat;
     S.ro = ro; S.ready = true;
   }
 
@@ -910,7 +941,7 @@
     if (S.ro) S.ro.disconnect();
     if (S.group) {
       S.group.traverse(function (o) { if (o.geometry) o.geometry.dispose(); });
-      [S.frontMat, S.backMat, S.sideMat, S.innerMat, S.fabricMat, S.woodMat, S.accentMat].forEach(function (m) {
+      [S.frontMat, S.backMat, S.sideMat, S.innerMat, S.fabricMat, S.woodMat, S.accentMat, S.trimMat].forEach(function (m) {
         if (m) { m.map = null; m.dispose(); }
       });
     }
@@ -964,6 +995,8 @@
     S.sideMat.color.copy(edgeBase);
     S.backMat.color.copy(new THREE.Color(base).lerp(new THREE.Color(0x000000), 0.06));
     var innerBase = new THREE.Color(base).lerp(new THREE.Color(0x000000), 0.5);
+    // 托特包内里固定接近纯黑（原型是深色布里），避免浅色配色下袋口露出一条灰带。
+    if (pid === 'tote') innerBase = new THREE.Color(0x141210);
     S.innerMat.color.copy(innerBase);
     var fabricBase = new THREE.Color(base).lerp(new THREE.Color(0x000000), 0.18);
     S.fabricMat.color.copy(fabricBase);
