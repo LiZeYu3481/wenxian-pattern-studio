@@ -62,6 +62,7 @@
     frontMat: null, backMat: null, sideMat: null, innerMat: null,
     fabricMat: null, woodMat: null, accentMat: null, trimMat: null,
     umbrellaMetal: null, umbrellaShaft: null,
+    paperMat: null, elasticMat: null, bookclothMat: null,
     target: { rx: -0.08, ry: -0.32 }, drag: false, lx: 0, ly: 0,
     raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null
   };
@@ -642,29 +643,50 @@
       });
       return { group: g, shadowY: -1.5, shadowR: 1.6 };
     } else if (pid === 'notebook') {
-      // 笔记本：合上的硬壳本——封面整片印花 + 内缩纸页（只从侧边露出）+ 圆润书脊 + 烫金压线 + 书签带。
-      // 关键修复：旧版纸页厚 0.26 > 封面 0.22 且居中，把带纹样的封面整个盖住 → 只剩四边一点纹样。
-      // 现在封面厚度 0.20（表面 z=+0.10）；纸页厚 0.15、中心后移到 z=-0.055（前脸 z=+0.02），永远在封面之后。
-      // 封面：frontMat 贴印花，sideMat 作包边
-      g.add(extrude(roundRect(2.5, 3.35, 0.12), [-1.25, -1.675, 2.5, 3.35], 0.2, 0.035, F, D));
-      // 纸页：四周内缩（露出封面外沿一圈硬壳），夹紧在封面之后，只从右/上/下侧缘可见
-      g.add(mesh(new THREE.BoxGeometry(2.28, 3.12, 0.15), C, 0.07, 0, -0.055));
-      // 书脊：左侧沿 Y 轴的半圆柱（不旋转，默认就沿 Y），弧面朝左凸出形成圆润书背。
-      // 注意：CylinderGeometry 默认沿 Y 轴；旧版误加 Z=90° 旋转使它横躺成一根细条 + 大三角。
-      var spine = mesh(new THREE.CylinderGeometry(0.13, 0.13, 3.3, 24), D, -1.24, 0, 0);
-      g.add(spine);
-      // 封面烫金压线：内缩细边 + 书脊附近的竖线（在封面表面 z=+0.105 之上，不被遮）
-      var frame = roundRect(2.14, 2.99, 0.08).getSpacedPoints(72);
-      g.add(pipe(frame.map(function (p) { return [p.x, p.y, 0.15]; }), A, 0.009, 96));
-      g.add(mesh(new THREE.BoxGeometry(0.018, 2.99, 0.008), A, -0.94, 0, 0.15));
-      // 书签带：从顶端垂到本子下缘的一条细带（贴平封面，末端用一个朝下的扁平三角做燕尾）。
-      g.add(mesh(new THREE.BoxGeometry(0.075, 0.9, 0.012), A, 0.82, -1.18, 0.152));
-      // 燕尾用两个极薄的三角片贴在封面上（rotation.z 让尖端朝下），不再用会戳出大面的锥体。
-      var tailShape = new THREE.Shape();
-      tailShape.moveTo(-0.055, 0.09); tailShape.lineTo(0.055, 0.09); tailShape.lineTo(0, -0.09);
-      tailShape.closePath();
-      g.add(mesh(new THREE.ShapeGeometry(tailShape), A, 0.82, -1.72, 0.153));
-      return { group: g, shadowY: -1.94, shadowR: 1.5 };
+      // 笔记本（v20 对照参考图重做）：黑色圆角硬壳双封面 + 层叠乳白纸页 + 灰色织带松紧环
+      // + 深色布面书脊 + 从书口伸出的黑色书签丝带。封面/封底仍贴用户纹样（产品核心不碰）。
+      var PM = M.paperMat, EM = M.elasticMat, BC = M.bookclothMat;
+      var NW = 2.5, NH = 3.35, NR = 0.16;
+      var FRONT_Z = 0.17;    // 前封面中心：表面 z≈0.27
+      var BACK_Z = -0.25;    // 后封面中心：背面 z≈-0.35
+      // ── 前封面：圆角硬壳，正面贴用户纹样 F，包边用深色布面 BC ──
+      g.add(extrude(roundRect(NW, NH, NR), [-NW / 2, -NH / 2, NW, NH], 0.2, 0.035, F, BC));
+      var front = g.children[g.children.length - 1];
+      front.position.z = FRONT_Z - 0.1; // extrude 已居中 z=0，前表面 = pos.z+0.1
+      // ── 后封面：背面贴纹样 B，包边布面 BC ──
+      g.add(extrude(roundRect(NW, NH, NR), [-NW / 2, -NH / 2, NW, NH], 0.2, 0.035, B, BC));
+      var back = g.children[g.children.length - 1];
+      back.position.z = BACK_Z + 0.1; // 后表面 = pos.z-0.1
+      // ── 层叠纸页：24 张极薄乳白片，四周内缩露出硬壳边；侧面自然形成分层纸纹 ──
+      var PW = 2.3, PH = 3.15, SHEETS = 24;
+      var pz0 = BACK_Z + 0.1, pz1 = FRONT_Z - 0.1; // 前后封面内表面之间
+      for (var s = 0; s < SHEETS; s++) {
+        var zz = pz0 + (pz1 - pz0) * (s + 0.5) / SHEETS;
+        // 每隔 3 张夹一张略深的纸边，侧面呈清晰的分层细线（参考图纸张层叠感）
+        var sm = (s % 3 === 0) ? C : PM;
+        g.add(mesh(new THREE.BoxGeometry(PW, PH, (pz1 - pz0) / SHEETS * 0.82), sm, 0.06, 0, zz));
+      }
+      // ── 布面书脊：左侧沿 Y 的半圆柱，弧面朝左凸出，连接前后封面 ──
+      g.add(mesh(new THREE.CylinderGeometry(0.19, 0.19, NH - 0.06, 28), BC, -NW / 2 + 0.02, 0, (FRONT_Z + BACK_Z) / 2 - 0.04));
+      // ── 灰色织带松紧环：竖向偏右，从前封面绕过顶/底到下封面，环形闭合 ──
+      var EX = 0.62, EW = 0.13;
+      var zTop = FRONT_Z + 0.11, zBot = BACK_Z - 0.11;
+      // 前段（贴在封面表面）
+      g.add(mesh(new THREE.BoxGeometry(EW, NH - 0.12, 0.028), EM, EX, 0, zTop));
+      // 后段（贴在封底背面）
+      g.add(mesh(new THREE.BoxGeometry(EW, NH - 0.12, 0.028), EM, EX, 0, zBot));
+      // 顶/底跨接段：绕过硬壳顶缘与底缘
+      g.add(mesh(new THREE.BoxGeometry(EW, 0.028, zTop - zBot), EM, EX, NH / 2 - 0.03, (zTop + zBot) / 2));
+      g.add(mesh(new THREE.BoxGeometry(EW, 0.028, zTop - zBot), EM, EX, -NH / 2 + 0.03, (zTop + zBot) / 2));
+      // ── 书签丝带：从顶端夹缝伸出一小截、贴在封面上垂下 1/3，末端燕尾（贴合参考图）──
+      var ribbonZ = zTop + 0.02, RX = -0.82;
+      g.add(mesh(new THREE.BoxGeometry(0.1, 1.05, 0.016), BC, RX, NH / 2 - 0.52, ribbonZ));
+      var rtail = new THREE.Shape();
+      rtail.moveTo(-0.05, 0.08); rtail.lineTo(0.05, 0.08); rtail.lineTo(0, -0.09); rtail.closePath();
+      g.add(mesh(new THREE.ShapeGeometry(rtail), BC, RX, NH / 2 - 1.1, ribbonZ + 0.001));
+      // 顶部夹缝里露出的带头
+      g.add(mesh(new THREE.BoxGeometry(0.1, 0.12, 0.02), BC, RX, NH / 2 + 0.02, ribbonZ - 0.01));
+      return { group: g, shadowY: -2.0, shadowR: 1.5 };
 
     } else if (pid === 'umbrella') {
       // 晴雨伞（v19 对照参考图重做）：饱满圆弧伞面 + 扇贝波浪边 + 银灰金属主骨/副骨
@@ -896,7 +918,11 @@
       trimMat: new THREE.MeshStandardMaterial({ color: 0x12100f, roughness: 0.92, metalness: 0, side: ds, envMapIntensity: 0.18 }),
       // 晴雨伞专用：银灰金属伞骨/伞帽（参考图的金属骨架），黑色中棒/弯钩柄。
       umbrellaMetal: new THREE.MeshStandardMaterial({ color: 0x9b9a96, roughness: 0.38, metalness: 0.78, envMapIntensity: 0.95 }),
-      umbrellaShaft: new THREE.MeshStandardMaterial({ color: 0x161615, roughness: 0.62, metalness: 0.25, envMapIntensity: 0.5 })
+      umbrellaShaft: new THREE.MeshStandardMaterial({ color: 0x161615, roughness: 0.62, metalness: 0.25, envMapIntensity: 0.5 }),
+      // 笔记本专用：乳白层叠纸页、灰色织带松紧带、深色布面书脊。
+      paperMat: new THREE.MeshStandardMaterial({ color: 0xf4f1e8, roughness: 0.97, metalness: 0, side: ds, envMapIntensity: 0.22 }),
+      elasticMat: new THREE.MeshStandardMaterial({ color: 0x56534f, roughness: 0.95, metalness: 0, envMapIntensity: 0.22 }),
+      bookclothMat: new THREE.MeshStandardMaterial({ color: 0x35322f, roughness: 0.9, metalness: 0, envMapIntensity: 0.3 })
     };
 
     // 陶瓷（马克杯/瓷盘）：哑光釉面 roughness≈0.75（网络规范 0.7–0.9），非塑料高光。
@@ -979,6 +1005,7 @@
     S.sideMat = M.sideMat; S.innerMat = M.innerMat; S.fabricMat = M.fabricMat;
     S.woodMat = M.woodMat; S.accentMat = M.accentMat; S.trimMat = M.trimMat;
     S.umbrellaMetal = M.umbrellaMetal; S.umbrellaShaft = M.umbrellaShaft;
+    S.paperMat = M.paperMat; S.elasticMat = M.elasticMat; S.bookclothMat = M.bookclothMat;
     S.ro = ro; S.ready = true;
   }
 
@@ -987,7 +1014,7 @@
     if (S.ro) S.ro.disconnect();
     if (S.group) {
       S.group.traverse(function (o) { if (o.geometry) o.geometry.dispose(); });
-      [S.frontMat, S.backMat, S.sideMat, S.innerMat, S.fabricMat, S.woodMat, S.accentMat, S.trimMat, S.umbrellaMetal, S.umbrellaShaft].forEach(function (m) {
+      [S.frontMat, S.backMat, S.sideMat, S.innerMat, S.fabricMat, S.woodMat, S.accentMat, S.trimMat, S.umbrellaMetal, S.umbrellaShaft, S.paperMat, S.elasticMat, S.bookclothMat].forEach(function (m) {
         if (m) { m.map = null; m.dispose(); }
       });
     }
