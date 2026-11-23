@@ -985,7 +985,14 @@
     function resize() {
       var w = host.clientWidth || 600, h = host.clientHeight || 600;
       renderer.setSize(w, h, false);
-      camera.aspect = w / h;
+      var aspect = w / h;
+      camera.aspect = aspect;
+      // v21 屏幕自适应：容器变窄（竖屏 / 分屏）时水平视野随之变窄，
+      // 按宽高比补偿相机距离，保证任意屏幕比例下模型都完整入镜、不被裁切。
+      var dist = 8.6;
+      if (aspect < 1) dist = 8.6 / Math.max(0.55, aspect);
+      else if (aspect > 1.6) dist = 8.6 * (1 - Math.min(0.16, (aspect - 1.6) * 0.1));
+      camera.position.set(0, 0, dist);
       camera.updateProjectionMatrix();
     }
     resize();

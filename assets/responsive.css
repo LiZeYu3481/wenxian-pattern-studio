@@ -1,0 +1,137 @@
+/* 纹现 · v21 屏幕自适应补丁
+   目标：同一套页面在手机 / 平板 / 笔记本 / 宽屏显示器上都完整可用。
+   原则：只做布局与触控尺寸覆盖，不改品牌视觉与 3D 内容。 */
+
+/* ── 全局 ───────────────────────────────────────────────────────────── */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip; /* 不产生横向滚动；比 hidden 友好，不破坏 sticky */
+  -webkit-text-size-adjust: 100%;
+}
+#root { min-height: 100dvh; }
+* { -webkit-tap-highlight-color: transparent; }
+
+/* 顶栏与内容区同宽，宽屏不再出现左右错位 */
+header > div { max-width: 1600px !important; }
+header nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+header nav::-webkit-scrollbar { display: none; }
+
+/* ── 设计间：桌面（≥1024px） ───────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* 收紧页头留白，把首屏空间让给 3D 预览 */
+  [class*="max-w-[1600px]"] { padding-top: 88px !important; }
+  [class*="max-w-[1600px]"] h1 { font-size: 40px !important; }
+  [class*="lg:grid-cols-[minmax"] { margin-top: 24px !important; }
+  [class*="lg:grid-cols-[minmax"] {
+    grid-template-columns: minmax(0, 1fr) 360px !important;
+    gap: 28px !important;
+  }
+  /* 画布保持正方形，且完整落在首屏内（含视角按钮） */
+  [class*="lg:grid-cols-[minmax"] > div:first-child {
+    position: sticky;
+    top: 88px;
+    width: min(100%, calc(100dvh - 210px)) !important;
+    margin-inline: auto;
+  }
+}
+@media (min-width: 1280px) {
+  [class*="lg:grid-cols-[minmax"] { grid-template-columns: minmax(0, 1fr) 390px !important; }
+}
+@media (min-width: 1600px) {
+  [class*="lg:grid-cols-[minmax"] { grid-template-columns: minmax(0, 1fr) 420px !important; }
+}
+
+/* ── 设计间：平板 / 手机（<1024px）单列 ─────────────────────────────── */
+@media (max-width: 1023px) {
+  [class*="lg:grid-cols-[minmax"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 24px !important;
+    align-items: stretch !important;
+  }
+  [class*="lg:grid-cols-[minmax"] > div:first-child {
+    position: static !important;
+    width: min(100%, 560px) !important;
+    margin-inline: auto;
+  }
+  /* 控制面板在平板上居中收窄，避免整行过长难扫读 */
+  [class*="lg:grid-cols-[minmax"] > div:last-child {
+    width: min(100%, 720px) !important;
+    margin-inline: auto;
+  }
+  [class*="lg:grid-cols-[minmax"] + p,
+  [class*="lg:grid-cols-[minmax"] ~ p { max-width: 100% !important; }
+}
+
+/* 手机画布：受屏宽与屏高双重约束，横屏也不会顶出屏幕 */
+@media (max-width: 640px) {
+  [class*="lg:grid-cols-[minmax"] > div:first-child {
+    width: min(100%, calc(100dvh - 190px), 520px) !important;
+    min-width: 240px;
+  }
+  [class*="aspect-square"][class*="hairline-all"] { background-size: 28px 28px !important; }
+
+  /* 顶部品牌与导航在窄屏完整露出，不依赖横向滚动 */
+  header > div { height: 56px !important; gap: 8px !important; padding-inline: 12px !important; }
+  header nav { gap: 4px !important; }
+  header nav .pill-dash {
+    padding: 0 9px !important;
+    min-height: 34px;
+    font-size: 12px !important;
+    letter-spacing: .06em !important;
+  }
+  header button[aria-label="回到首页"] { gap: 8px !important; }
+  header button[aria-label="回到首页"] span:first-of-type { font-size: 18px !important; }
+
+  /* 3D 视角按钮：加大触控热区 */
+  [class*="absolute"][class*="rounded-full"][class*="z-20"] { bottom: 10px !important; gap: 4px !important; padding: 4px !important; }
+  [class*="absolute"][class*="rounded-full"][class*="z-20"] button {
+    min-width: 48px;
+    min-height: 34px;
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+  }
+
+  /* 手风琴与载体按钮：手指点得到 */
+  [class*="space-y-3"] button { min-height: 36px; }
+  [class*="grid-cols-3"] button { min-height: 74px; padding: 6px 4px !important; }
+  [class*="grid-cols-3"] button div[class*="aspect-square"] { padding: 4px !important; }
+
+  /* 标题字号收敛，避免小屏挤成两行 */
+  [class*="pt-24"] { padding-top: 84px !important; }
+  [class*="pt-24"] h1 { font-size: 30px !important; }
+  [class*="pt-24"] > div:first-child p:first-child { font-size: 11px !important; letter-spacing: .28em !important; }
+}
+
+@media (max-width: 360px) {
+  header nav .pill-dash { padding: 0 7px !important; font-size: 11px !important; letter-spacing: .02em !important; }
+  header button[aria-label="回到首页"] span:first-of-type { font-size: 16px !important; }
+  header button[aria-label="回到首页"] svg { width: 22px; height: 22px; }
+  [class*="grid-cols-3"] button { min-height: 66px; }
+}
+
+/* 横屏手机：极矮视口下收起标题区，画布与视角按钮同屏 */
+@media (max-height: 520px) and (orientation: landscape) {
+  [class*="max-w-[1600px]"] { padding-top: 72px !important; padding-bottom: 40px !important; }
+  [class*="max-w-[1600px]"] > div:first-child { display: none !important; }
+  [class*="lg:grid-cols-[minmax"] { margin-top: 12px !important; }
+  [class*="lg:grid-cols-[minmax"] > div:first-child {
+    width: min(100%, calc(100dvh - 100px), 380px) !important;
+  }
+}
+
+/* 尊重系统减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* 刘海屏安全区 */
+@supports (padding: env(safe-area-inset-left)) {
+  header > div { padding-left: max(16px, env(safe-area-inset-left)) !important; padding-right: max(16px, env(safe-area-inset-right)) !important; }
+}
