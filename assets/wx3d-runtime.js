@@ -842,6 +842,312 @@
         g.add(mesh(new THREE.TorusGeometry(rr, 0.012, 6, 72), C, 0, -0.66 - (rr - 0.99) * 0.34, 0, Math.PI / 2));
       });
       return { group: g, shadowY: -1.08, shadowR: 1.85 };
+    } else if (pid === 'teapot') {
+      // 茶壶：圆润壶腹车削 + 壶盖提钮 + 壶嘴 + 环形把手，壶身满印
+      var tp = [
+        [0.0,-1.15],[0.5,-1.15],[0.72,-1.08],[0.92,-0.86],[1.08,-0.5],
+        [1.14,-0.12],[1.08,0.24],[0.9,0.55],[0.66,0.72],[0.58,0.78]
+      ];
+      var tg = new THREE.LatheGeometry(tp.map(function(q){return new THREE.Vector2(q[0],q[1]);}),64);
+      latheSideUV(tg,2.2,1.0); g.add(mesh(tg,F));
+      // 内壁深色
+      g.add(mesh(new THREE.LatheGeometry([[0.56,0.78],[0.52,0.5],[0.4,0.0],[0.2,-0.6],[0,-0.9]].map(function(q){return new THREE.Vector2(q[0],q[1]);}),40),I));
+      // 壶盖：微拱盖片 + 盖沿 + 提钮
+      g.add(mesh(new THREE.SphereGeometry(0.6,40,16,0,Math.PI*2,0,Math.PI/2.6),F,0,0.78,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.62,0.6,0.07,48),D,0,0.79,0));
+      g.add(mesh(new THREE.SphereGeometry(0.15,20,14),A,0,1.08,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.05,0.06,0.12,16),A,0,0.98,0));
+      // 壶嘴：从壶肩斜向上外伸的锥管
+      var spout = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.2,0.95,20,1,true),F);
+      spout.position.set(1.02,0.28,0); spout.rotation.z=-0.85; g.add(spout);
+      g.add(mesh(new THREE.TorusGeometry(0.12,0.028,8,20),A,1.42,0.63,0,0,Math.PI/2));
+      // 环形把手：壶身另一侧的大 C 形耳柄
+      g.add(pipe([[-0.95,0.5,0],[-1.45,0.55,0],[-1.75,0.15,0],[-1.62,-0.4,0],[-1.12,-0.62,0]],D,0.075,40));
+      // 圈足
+      g.add(mesh(new THREE.CylinderGeometry(0.5,0.5,0.08,40),D,0,-1.18,0));
+      return { group: g, shadowY: -1.32, shadowR: 1.6 };
+
+    } else if (pid === 'teacup') {
+      // 品茗杯：小巧敞口杯，外壁满印、内壁深色、圈足
+      var cp = [[0,-0.72],[0.34,-0.72],[0.5,-0.66],[0.66,-0.4],[0.76,-0.05],[0.8,0.3],[0.79,0.42]];
+      var cg = new THREE.LatheGeometry(cp.map(function(q){return new THREE.Vector2(q[0],q[1]);}),56);
+      latheSideUV(cg,2.0,1.0); g.add(mesh(cg,F));
+      g.add(mesh(new THREE.LatheGeometry([[0.77,0.42],[0.7,0.1],[0.56,-0.35],[0.34,-0.62],[0,-0.66]].map(function(q){return new THREE.Vector2(q[0],q[1]);}),44),I));
+      g.add(mesh(new THREE.TorusGeometry(0.785,0.03,10,48),A,0,0.42,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.34,0.32,0.07,40),C,0,-0.75,0));
+      return { group: g, shadowY: -0.86, shadowR: 1.05 };
+
+    } else if (pid === 'candle') {
+      // 香薰蜡烛：玻璃杯身满印 + 蜡面 + 烛芯 + 火苗
+      g.add(mesh(new THREE.CylinderGeometry(0.82,0.76,1.9,56,1,true),F));
+      g.add(mesh(new THREE.CylinderGeometry(0.76,0.76,0.06,48),F,0,0.95,0));
+      g.add(mesh(new THREE.CircleGeometry(0.74,48),C,0,0.96,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.02,0.02,0.18,8),D,0,1.04,0));
+      var flame = mesh(new THREE.SphereGeometry(0.1,16,12),A,0,1.2,0);
+      flame.scale.set(0.7,1.7,0.7); g.add(flame);
+      g.add(mesh(new THREE.TorusGeometry(0.81,0.035,10,48),A,0,0.96,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.78,0.78,0.07,48),D,0,-0.95,0));
+      return { group: g, shadowY: -1.05, shadowR: 1.1 };
+
+    } else if (pid === 'bowl') {
+      // 汤碗：敞口弧腹碗，外壁满印、内壁也印、圈足
+      var bp = [[0,-0.62],[0.42,-0.62],[0.62,-0.5],[0.92,-0.12],[1.18,0.3],[1.3,0.58],[1.29,0.62]];
+      var bg = new THREE.LatheGeometry(bp.map(function(q){return new THREE.Vector2(q[0],q[1]);}),64);
+      latheSideUV(bg,2.4,1.0); g.add(mesh(bg,F));
+      // 内壁（印花，UV 翻转）从口沿向内收
+      var bi = new THREE.LatheGeometry([[1.28,0.62],[1.14,0.34],[0.88,-0.05],[0.58,-0.42],[0.36,-0.54],[0,-0.56]].map(function(q){return new THREE.Vector2(q[0],q[1]);}),56);
+      latheSideUV(bi,2.4,1.0); g.add(mesh(bi,F));
+      g.add(mesh(new THREE.TorusGeometry(1.295,0.028,10,56),A,0,0.62,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.5,0.48,0.1,48),D,0,-0.68,0));
+      return { group: g, shadowY: -0.78, shadowR: 1.45 };
+
+    } else if (pid === 'teaJar') {
+      // 茶叶罐：圆柱罐身满印 + 密封盖 + 描金圈 + 提钮
+      g.add(mesh(new THREE.CylinderGeometry(0.86,0.86,2.1,56),F));
+      g.add(mesh(new THREE.CylinderGeometry(0.9,0.9,0.16,56),D,0,1.13,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.82,0.82,0.1,56),A,0,1.24,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.5,0.56,0.16,48),F,0,1.32,0));
+      g.add(mesh(new THREE.SphereGeometry(0.13,16,12),A,0,1.45,0));
+      g.add(mesh(new THREE.TorusGeometry(0.865,0.02,8,56),A,0,0.7,0,Math.PI/2));
+      g.add(mesh(new THREE.TorusGeometry(0.865,0.02,8,56),A,0,-0.7,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.86,0.86,0.08,56),D,0,-1.09,0));
+      return { group: g, shadowY: -1.14, shadowR: 1.1 };
+
+    } else if (pid === 'planter') {
+      // 花盆：上宽下窄切割锥台满印 + 外翻盆沿 + 泥土 + 绿叶
+      var pg = new THREE.CylinderGeometry(1.05,0.72,1.7,48,1,true);
+      scaleUV(pg,2.2,1.0); g.add(mesh(pg,F));
+      g.add(mesh(new THREE.CylinderGeometry(0.72,0.72,0.08,48),D,0,-0.85,0));
+      g.add(mesh(new THREE.TorusGeometry(1.05,0.09,12,48),D,0,0.85,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.92,0.92,0.1,48),D,0,0.78,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.9,0.9,0.06,40),M.fabricMat,0,0.84,0)); // 泥土
+      // 几片绿叶
+      [[0,0.1,0],[-0.4,-0.25,0.35],[0.45,-0.15,-0.3]].forEach(function(p,idx){
+        var leaf=mesh(new THREE.SphereGeometry(0.34,16,10),C,p[0],1.15+idx*0.08,p[2]);
+        leaf.scale.set(0.5,1.5,0.28); leaf.rotation.z=(idx-1)*0.5; g.add(leaf);
+      });
+      return { group: g, shadowY: -0.92, shadowR: 1.2 };
+
+    } else if (pid === 'pencilHolder') {
+      // 笔筒：圆柱筒身满印 + 内腔深色 + 底 + 几支铅笔
+      g.add(mesh(new THREE.CylinderGeometry(0.66,0.66,1.85,48,1,true),F));
+      g.add(mesh(new THREE.CylinderGeometry(0.6,0.6,1.8,48,1,true),I));
+      g.add(mesh(new THREE.CircleGeometry(0.6,48),I,0,-0.9,0,Math.PI/2));
+      g.add(mesh(new THREE.TorusGeometry(0.66,0.035,10,48),A,0,0.925,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.66,0.66,0.08,48),D,0,-0.93,0));
+      // 铅笔（六棱杆 + 笔尖）
+      [[-0.2,0.28,0.05],[0.15,0.4,-0.1],[0.28,0.2,0.2],[-0.05,0.5,0.25]].forEach(function(p,idx){
+        var colors=[0xc0392b,0x2980b9,0xd4ac0d,0x27ae60];
+        var pm=new THREE.MeshStandardMaterial({color:colors[idx],roughness:0.7});
+        g.add(mesh(new THREE.CylinderGeometry(0.06,0.06,1.5,6),pm,p[0],p[1]+0.3,p[2],0,0,(idx-1.5)*0.06));
+        g.add(mesh(new THREE.ConeGeometry(0.06,0.22,6),C,p[0],p[1]+1.16,p[2],0,0,(idx-1.5)*0.06));
+      });
+      return { group: g, shadowY: -1.0, shadowR: 0.95 };
+
+    } else if (pid === 'tumbler') {
+      // 随行杯：高瘦杯身满印 + 锥盖 + 吸管 + 提环
+      var tu=new THREE.CylinderGeometry(0.62,0.5,2.5,56,1,true);
+      scaleUV(tu,2.2,1.0); g.add(mesh(tu,F));
+      g.add(mesh(new THREE.CylinderGeometry(0.62,0.5,0.08,56),D,0,-1.25,0));
+      // 杯盖：锥形 + 顶台
+      g.add(mesh(new THREE.CylinderGeometry(0.66,0.63,0.16,56),D,0,1.32,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.4,0.66,0.3,56),D,0,1.52,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.34,0.34,0.06,48),A,0,1.68,0));
+      // 吸管
+      g.add(mesh(new THREE.CylinderGeometry(0.055,0.055,0.7,16),A,0.2,1.95,0,0,0,0.2));
+      // 提环
+      g.add(mesh(new THREE.TorusGeometry(0.28,0.035,8,28),D,0,1.82,0,Math.PI/2));
+      return { group: g, shadowY: -1.32, shadowR: 0.95 };
+
+    } else if (pid === 'perfume') {
+      // 香水瓶：圆角方瓶身满印 + 肩 + 颈 + 喷头 + 方盖
+      g.add(extrude(roundRect(1.7,1.9,0.24),[-0.85,-0.95,1.7,1.9],0.9,0.08,F,D));
+      // 瓶肩收口
+      g.add(mesh(new THREE.CylinderGeometry(0.42,0.62,0.3,32),F,0,1.05,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.24,0.24,0.18,28),A,0,1.28,0));
+      // 方形瓶盖
+      g.add(extrude(roundRect(0.62,0.62,0.08),[-0.31,-0.31,0.62,0.62],0.5,0.03,A,D));
+      g.children[g.children.length-1].position.y=1.6;
+      g.add(mesh(new THREE.TorusGeometry(0.85,0.02,8,40),A,0,-0.95,0,Math.PI/2,Math.PI));
+      return { group: g, shadowY: -1.1, shadowR: 1.3 };
+
+    } else if (pid === 'giftBox') {
+      // 礼盒：方形盒身满印 + 盒盖 + 十字丝带 + 蝴蝶结
+      g.add(mesh(new THREE.BoxGeometry(2.5,1.7,2.0),F));
+      g.add(mesh(new THREE.BoxGeometry(2.62,0.3,2.12),D,0,0.98,0));
+      g.add(mesh(new THREE.BoxGeometry(2.64,0.06,2.14),F,0,1.16,0));
+      // 十字丝带
+      var ribbon=new THREE.MeshStandardMaterial({color:0xa8322c,roughness:0.55,metalness:0.05,side:THREE.DoubleSide});
+      g.add(mesh(new THREE.BoxGeometry(0.34,1.74,2.16),ribbon,0,0,0));
+      g.add(mesh(new THREE.BoxGeometry(2.66,1.74,0.34),ribbon,0,0,0));
+      g.add(mesh(new THREE.BoxGeometry(0.34,0.32,2.18),ribbon,0,1.0,0));
+      g.add(mesh(new THREE.BoxGeometry(2.68,0.32,0.34),ribbon,0,1.0,0));
+      // 蝴蝶结
+      [-1,1].forEach(function(s){var b=mesh(new THREE.SphereGeometry(0.3,16,12),ribbon,s*0.32,1.22,0);b.scale.set(1.2,0.7,0.5);g.add(b);});
+      g.add(mesh(new THREE.SphereGeometry(0.16,16,12),ribbon,0,1.22,0));
+      return { group: g, shadowY: -0.95, shadowR: 1.9 };
+
+    } else if (pid === 'tissueBox') {
+      // 纸巾盒：布艺长方体满印 + 顶面开口 + 露出的纸巾
+      g.add(mesh(new THREE.BoxGeometry(2.7,1.5,1.7),F));
+      g.add(mesh(new THREE.BoxGeometry(2.72,0.06,1.72),C,0,0.76,0));
+      // 顶面椭圆开口（深色）
+      var hole=mesh(new THREE.CircleGeometry(0.52,32),I,0,0.8,0,Math.PI/2);
+      hole.scale.set(1.6,1,1); g.add(hole);
+      // 露出的纸巾
+      var tissue=mesh(new THREE.SphereGeometry(0.42,20,14),M.paperMat,0,0.95,0);
+      tissue.scale.set(1.5,0.7,1.0); g.add(tissue);
+      g.add(mesh(new THREE.BoxGeometry(0.5,0.5,0.02),M.paperMat,0.05,1.28,0,0.1,0.2,0.15));
+      return { group: g, shadowY: -0.85, shadowR: 1.85 };
+
+    } else if (pid === 'lantern') {
+      // 宫灯：六角灯罩满印 + 上下盖 + 提梁 + 流苏
+      var lant=new THREE.CylinderGeometry(0.95,0.95,1.9,6,1,true);
+      scaleUV(lant,1.5,1.0); g.add(mesh(lant,F,0,0,0,0,Math.PI/6,0));
+      // 六根竖向骨架
+      for(var li=0;li<6;li++){var a=li/6*Math.PI*2+Math.PI/6;g.add(mesh(new THREE.BoxGeometry(0.05,1.92,0.05),W,0.95*Math.cos(a),0,0.95*Math.sin(a)));}
+      g.add(mesh(new THREE.CylinderGeometry(1.0,1.0,0.14,6),W,0,0.98,0,0,Math.PI/6,0));
+      g.add(mesh(new THREE.CylinderGeometry(1.0,1.0,0.14,6),W,0,-0.98,0,0,Math.PI/6,0));
+      g.add(mesh(new THREE.TorusGeometry(0.5,0.035,8,24),A,0,1.45,0,Math.PI/2));
+      g.add(pipe([[0,1.05,0],[0,1.5,0]],D,0.02,10));
+      // 底部流苏
+      for(var t2=-2;t2<=2;t2++){g.add(pipe([[t2*0.08,-1.05,0],[t2*0.1,-1.4,0],[t2*0.12,-1.7,0]],A,0.014,12));}
+      return { group: g, shadowY: -1.85, shadowR: 1.2 };
+
+    } else if (pid === 'lamp') {
+      // 台灯：锥形布艺灯罩满印 + 灯杆 + 圆盘底座
+      var shade=new THREE.CylinderGeometry(0.72,1.12,1.3,48,1,true);
+      scaleUV(shade,2.0,1.0); g.add(mesh(shade,F,0,1.25,0));
+      g.add(mesh(new THREE.TorusGeometry(0.72,0.03,10,48),D,0,1.9,0,Math.PI/2));
+      g.add(mesh(new THREE.TorusGeometry(1.12,0.03,10,48),D,0,0.6,0,Math.PI/2));
+      // 灯杆
+      g.add(mesh(new THREE.CylinderGeometry(0.06,0.06,1.0,20),A,0,0.1,0));
+      // 底座
+      g.add(mesh(new THREE.CylinderGeometry(0.7,0.78,0.14,48),W,0,-0.48,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.4,0.5,0.1,40),A,0,-0.4,0));
+      return { group: g, shadowY: -0.56, shadowR: 1.3 };
+
+    } else if (pid === 'tray') {
+      // 托盘：圆形浅盘，盘面满印（平铺 UV）+ 上翘盘沿 + 描金边 + 两侧提耳
+      var trayProf=[
+        new THREE.Vector2(0,0),new THREE.Vector2(0.9,0.0),new THREE.Vector2(1.5,0.02),
+        new THREE.Vector2(1.72,0.16),new THREE.Vector2(1.75,0.2),new THREE.Vector2(1.7,0.2),
+        new THREE.Vector2(1.45,0.08),new THREE.Vector2(0.9,-0.06),new THREE.Vector2(0.85,-0.14),new THREE.Vector2(0.7,-0.14)
+      ];
+      g.add(lathe(trayProf,F,64,true,3.6));
+      g.add(mesh(new THREE.TorusGeometry(1.72,0.028,8,64),A,0,0.19,0,Math.PI/2));
+      [-1,1].forEach(function(s){
+        g.add(mesh(new THREE.TorusGeometry(0.22,0.045,10,24),A,s*1.9,0.1,0,Math.PI/2));
+      });
+      return { group: g, shadowY: -0.25, shadowR: 1.95 };
+
+    } else if (pid === 'baseballCap') {
+      // 棒球帽：半球帽冠满印 + 弧形帽檐 + 顶扣 + 分缝
+      var crown=new THREE.SphereGeometry(1.12,48,24,0,Math.PI*2,0,Math.PI/2.1);
+      var cg2=crown.attributes.uv;
+      g.add(mesh(crown,F,0,0.1,0));
+      // 帽冠底圈
+      g.add(mesh(new THREE.CylinderGeometry(1.12,1.1,0.16,48,1,true),F,0,0.02,0));
+      // 帽檐：前方伸出的扁弧面
+      var brim=new THREE.SphereGeometry(1.15,40,16,0,Math.PI,Math.PI/2-0.28,0.3);
+      var bm=mesh(brim,F,0,0.0,0); bm.scale.set(1,0.12,1.05); bm.rotation.x=-0.12; g.add(bm);
+      g.add(mesh(new THREE.SphereGeometry(0.09,16,12),A,0,1.2,0));
+      // 顶部分缝
+      g.add(pipe([[0,1.2,0],[0,0.75,1.05],[0,0.15,1.12]],D,0.012,20));
+      return { group: g, shadowY: -0.2, shadowR: 1.35 };
+
+    } else if (pid === 'canvasBag') {
+      // 帆布袋：鼓起的立体袋身（正背满印）+ 袋口 + 两条扁带提手
+      var BW=1.55,BH=1.7;
+      function bagZ(u,v){var e=Math.abs(u-0.5)*2,t=Math.abs(v-0.5)*2;return 0.28*(1-0.35*Math.pow(e,3))*(1-0.3*Math.pow(t,4))+0.02*Math.sin(u*12)*Math.sin(v*8);}
+      g.add(gridMesh(40,32,function(v,u){return [(u-0.5)*2*BW,(v-0.5)*2*BH,bagZ(u,v),u,v];},F));
+      g.add(gridMesh(40,32,function(v,u){return [(u-0.5)*2*BW,(v-0.5)*2*BH,-bagZ(u,v),1-u,v];},B));
+      // 侧围
+      var bagLoop=[];
+      for(var be=0;be<=96;be++){var bt=be/96;
+        if(bt<=0.25)bagLoop.push([bt*4,0]);else if(bt<=0.5)bagLoop.push([1,(bt-0.25)*4]);
+        else if(bt<=0.75)bagLoop.push([1-(bt-0.5)*4,1]);else bagLoop.push([0,1-(bt-0.75)*4]);}
+      g.add(gridMesh(96,5,function(w,t){var uv2=bagLoop[Math.min(96,Math.round(t*96))];return [(uv2[0]-0.5)*2*BW,(uv2[1]-0.5)*2*BH,bagZ(uv2[0],uv2[1])*(1-2*w),t*3,w*0.5];},C));
+      // 袋口卷边
+      var topEdge=[];
+      for(var te=0;te<=40;te++){var tu2=te/40;topEdge.push([(tu2-0.5)*2*BW,BH,bagZ(tu2,1)]);}
+      g.add(pipe(topEdge,C,0.035,64));
+      // 两条提手
+      [-0.7,0.7].forEach(function(hx){
+        g.add(pipe([[hx,BH-0.05,0.02],[hx,BH+0.55,0],[hx,BH-0.05,-0.02]],C,0.055,32));
+      });
+      return { group: g, shadowY: -1.85, shadowR: 1.7 };
+
+    } else if (pid === 'socks') {
+      // 袜子：两只立体袜（袜筒 + 弯折袜脚），袜身满印
+      function makeSock(ox,tilt){
+        var sg=new THREE.Group();
+        // 袜筒（上宽下略收的圆柱）
+        var leg=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.36,1.7,32,1,true),F);
+        leg.position.set(0,0.6,0); sg.add(leg);
+        sg.add(mesh(new THREE.TorusGeometry(0.42,0.06,10,32),C,0,1.45,0,Math.PI/2));
+        sg.add(mesh(new THREE.CircleGeometry(0.36,32),C,0,-0.25,0,Math.PI/2));
+        // 袜脚：横向的半椭球 + 脚尖
+        var foot=mesh(new THREE.SphereGeometry(0.4,28,18),F,0.42,-0.35,0);
+        foot.scale.set(1.7,0.72,0.95); sg.add(foot);
+        var toe=mesh(new THREE.SphereGeometry(0.36,24,16),F,1.1,-0.42,0);
+        toe.scale.set(1.0,0.7,0.9); sg.add(toe);
+        // 脚跟
+        sg.add(mesh(new THREE.SphereGeometry(0.34,20,14),C,-0.28,-0.42,0));
+        sg.position.set(ox,0.35,0); sg.rotation.z=tilt; return sg;
+      }
+      g.add(makeSock(-0.62,0.14));
+      g.add(makeSock(0.62,-0.14));
+      return { group: g, shadowY: -0.55, shadowR: 1.7 };
+
+    } else if (pid === 'luggage') {
+      // 行李箱：圆角硬壳箱体满印 + 中缝拉链 + 提手 + 拉杆 + 万向轮
+      g.add(extrude(roundRect(2.3,3.1,0.3),[-1.15,-1.55,2.3,3.1],1.0,0.09,F,D));
+      // 正面装饰压线
+      g.add(mesh(new THREE.BoxGeometry(1.9,0.025,0.02),A,0,1.2,0.56));
+      g.add(mesh(new THREE.BoxGeometry(1.9,0.025,0.02),A,0,-1.2,0.56));
+      // 中缝拉链（环绕）
+      g.add(mesh(new THREE.BoxGeometry(0.02,3.1,1.0),A,0,0,0));
+      // 提手
+      g.add(pipe([[-0.35,1.55,0],[-0.35,1.9,0],[0.35,1.9,0],[0.35,1.55,0]],D,0.06,24));
+      // 拉杆
+      g.add(mesh(new THREE.CylinderGeometry(0.04,0.04,1.0,12),M.umbrellaMetal,-0.75,2.2,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.04,0.04,1.0,12),M.umbrellaMetal,0.75,2.2,0));
+      g.add(mesh(new THREE.BoxGeometry(1.6,0.1,0.1),D,0,2.68,0));
+      // 万向轮
+      [[-0.9,-1.65],[0.9,-1.65]].forEach(function(p){g.add(mesh(new THREE.CylinderGeometry(0.18,0.18,0.14,20),D,p[0],p[1],0,0,0,Math.PI/2));});
+      return { group: g, shadowY: -1.85, shadowR: 1.9 };
+
+    } else if (pid === 'speaker') {
+      // 蓝牙音箱：圆柱布艺网罩无缝环绕满印 + 金属顶盖 + 按键 + 底环
+      var spk=new THREE.CylinderGeometry(0.75,0.75,2.0,64,1,true);
+      scaleUV(spk,2.4,1.0); g.add(mesh(spk,F));
+      g.add(mesh(new THREE.CylinderGeometry(0.76,0.76,0.12,56),M.umbrellaMetal,0,1.0,0));
+      g.add(mesh(new THREE.CircleGeometry(0.7,48),M.umbrellaMetal,0,1.07,0,Math.PI/2));
+      // 顶部触控键
+      [[-0.3,0],[0,0],[0.3,0]].forEach(function(p,idx){
+        g.add(mesh(new THREE.CircleGeometry(0.09,20),idx===1?D:M.umbrellaShaft,p[0],1.075,p[1],Math.PI/2));
+      });
+      g.add(mesh(new THREE.TorusGeometry(0.76,0.03,10,56),D,0,-0.9,0,Math.PI/2));
+      g.add(mesh(new THREE.CylinderGeometry(0.76,0.76,0.08,56),D,0,-1.0,0));
+      return { group: g, shadowY: -1.08, shadowR: 1.0 };
+
+    } else if (pid === 'tableClock') {
+      // 座钟：圆形钟面满印 + 金属外壳 + 刻度 + 指针 + 底座
+      g.add(mesh(new THREE.CylinderGeometry(1.2,1.2,0.24,56),A,0,0.55,0,Math.PI/2));
+      g.add(mesh(new THREE.CircleGeometry(1.08,56),F,0,0.69,0,Math.PI/2));
+      // 刻度
+      for(var ki=0;ki<12;ki++){var ka=ki/12*Math.PI*2;
+        g.add(mesh(new THREE.BoxGeometry(0.05,0.16,0.02),D,0.86*Math.sin(ka),0.55+0.86*Math.cos(ka),0.7,0,0,-ka));}
+      // 指针
+      g.add(mesh(new THREE.BoxGeometry(0.06,0.62,0.02),D,0.2,0.85,0.72,0,0,-0.35));
+      g.add(mesh(new THREE.BoxGeometry(0.05,0.9,0.02),D,-0.25,0.78,0.72,0,0,0.5));
+      g.add(mesh(new THREE.SphereGeometry(0.09,16,12),A,0,0.55,0.74));
+      // 支柱 + 底座
+      g.add(mesh(new THREE.CylinderGeometry(0.1,0.12,0.6,20),A,0,-0.35,0));
+      g.add(mesh(new THREE.CylinderGeometry(0.7,0.8,0.16,48),W,0,-0.72,0));
+      return { group: g, shadowY: -0.82, shadowR: 1.1 };
+
     }
 
     // 兜底：未知 ID 用带厚度的盒子，避免白屏。
@@ -942,7 +1248,8 @@
     };
 
     // 陶瓷（马克杯/瓷盘）：哑光釉面 roughness≈0.75（网络规范 0.7–0.9），非塑料高光。
-    if (pid === 'mug' || pid === 'plate') {
+    if (pid === 'mug' || pid === 'plate' || pid === 'teapot' || pid === 'teacup' || pid === 'bowl' ||
+        pid === 'candle' || pid === 'teaJar' || pid === 'pencilHolder' || pid === 'planter') {
       M.frontMat.roughness = 0.72; M.frontMat.metalness = 0.02; M.frontMat.envMapIntensity = 0.85;
       M.sideMat.roughness = 0.74; M.sideMat.envMapIntensity = 0.8;
       M.innerMat.roughness = 0.68; M.innerMat.envMapIntensity = 0.7;
@@ -1007,7 +1314,7 @@
 
     // 初始视角：给足俯角与侧转，第一眼就能看出立体体积（而非一条平边）。
     // 平铺类（瓷盘/地毯/方巾）俯角更大；其余载体用中等俯角展现厚度与顶部细节。
-    if (pid === 'plate' || pid === 'rug' || pid === 'scarf') {
+    if (pid === 'plate' || pid === 'rug' || pid === 'scarf' || pid === 'tray') {
       S.target.rx = -0.62; S.target.ry = -0.34;
     } else if (pid === 'umbrella' || pid === 'fan') {
       S.target.rx = -0.16; S.target.ry = -0.3;
