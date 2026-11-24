@@ -66,7 +66,7 @@
     target: { rx: -0.08, ry: -0.32 }, drag: false, lx: 0, ly: 0,
     zoom: 1, baseDist: 8.6,
     raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null,
-    fan: null
+    fan: null, umbrella: null
   };
 
   function hex(v) {
@@ -578,66 +578,91 @@
       return { group: g, shadowY: -2.0, shadowR: 1.5 };
 
     } else if (pid === 'umbrella') {
-      // 晴雨伞（v19 对照参考图重做）：饱满圆弧伞面 + 扇贝波浪边 + 银灰金属主骨/副骨
-      // + 黑色中棒 + 滑环开关 + 多层金属伞帽 + 粗壮 J 形弯钩柄。纹样仍由用户纹样 F 决定。
+      // 晴雨伞（v30：加入点击开合动画）：8 瓣伞布 + 主骨 + 副骨各自装入一个以伞顶为铰链的
+      // pivot 组，收伞时整瓣绕铰链向下折拢成细束；中棒/滑环/伞帽/握把固定不动。
+      // 张开态几何与 v19 完全一致（顶点相对伞顶建，pivot 放回伞顶，净坐标不变）。
       var R = 1.95, cy = 1.62, PANELS = 8, DROP = 0.98;
       var UM = M.umbrellaMetal, US = M.umbrellaShaft;
-      // 伞面高度曲线：平滑圆弧穹顶（参考实物为圆顶而非尖斗笠），中心高、边缘缓降。
+      var CLOSE_ANGLE = -1.02;   // 收伞时每瓣向下折的角度（弧度）：伞缘收成一束、不共面闪烁
+      var CLOSED = 0.12;         // 闭合时的展开系数
+
       function canopyY(v) { return cy - DROP * Math.pow(v, 1.55); }
-      // 每瓣轮廓半径：浅扇贝边——瓣中央略下垂、瓣缝处微凸，避免深波浪锯齿感。
       function scallop(u, v) { return 1 - 0.035 * Math.cos((u - 0.5) * Math.PI * 2) * Math.pow(v, 3); }
-      // 伞面：按瓣生成，正反面都是纹样（F 双面材质），边缘扇贝清晰。
+
+      // 每瓣一个铰链组：轴 = 垂直于该瓣径向的水平向量；顶点以伞顶为原点建立。
+      var pivots = [];
+      var struts = [];           // 副骨撑杆：收伞时淡出（真实收起的伞看不到内部撑杆）
+      var ribRadii = [0.0, 0.26, 0.52, 0.78, 1.0];
       for (var pn = 0; pn < PANELS; pn++) {
         (function (idx) {
           var a0 = idx / PANELS * Math.PI * 2, a1 = (idx + 1) / PANELS * Math.PI * 2;
-          g.add(gridMesh(12, 12, function (v, u) {
+          var angMid = (idx + 0.5) / PANELS * Math.PI * 2;
+          var axis = new THREE.Vector3(-Math.sin(angMid), 0, Math.cos(angMid)).normalize();
+          var pv = new THREE.Group();
+          pv.position.set(0, cy, 0);
+          pv.userData.axis = axis;
+          g.add(pv);
+          pivots.push(pv);
+
+          // 伞布片（y 相对伞顶）
+          pv.add(gridMesh(12, 12, function (v, u) {
             var ang = a0 + (a1 - a0) * u;
             var rr = R * v * scallop(u, v);
-            var yy = canopyY(v);
-            // 瓣中央略低、折痕(伞骨)处略高，撑出布料起伏（幅度小，避免锯齿）。
+            var yy = canopyY(v) - cy;
             yy -= 0.035 * Math.sin(u * Math.PI) * Math.pow(v, 1.1);
             return [rr * Math.cos(ang), yy, rr * Math.sin(ang),
               idx / PANELS + u / PANELS, v];
           }, F));
+
+          // 主骨（沿瓣分缝，折痕线在 u=0）
+          var angR = idx / PANELS * Math.PI * 2;
+          var pts = ribRadii.map(function (v) {
+            var rr = R * v * scallop(0, v) - 0.02;
+            return [rr * Math.cos(angR), canopyY(v) - 0.075 - cy, rr * Math.sin(angR)];
+          });
+          pv.add(pipe(pts, UM, 0.015, 26));
+
+          // 副骨撑杆：主骨中部斜撑向中棒滑环
+          var midV = 0.52, midR = R * midV * scallop(0, midV) - 0.02;
+          var collarY = cy - DROP * 0.72;
+          var strut = pipe([
+            [midR * Math.cos(angR), canopyY(midV) - 0.075 - cy, midR * Math.sin(angR)],
+            [midR * 0.52 * Math.cos(angR), (canopyY(midV) + collarY) * 0.5 - 0.075 - cy, midR * 0.52 * Math.sin(angR)],
+            [0.075 * Math.cos(angR), collarY - cy, 0.075 * Math.sin(angR)]
+          ], UM, 0.01, 20);
+          pv.add(strut);
+          struts.push(strut);
         })(pn);
       }
-      // 伞骨骨架：沿每瓣的分缝（折痕线）走，位于伞布内侧（y 略低 0.02），银灰金属。
-      var ribRadii = [0.0, 0.26, 0.52, 0.78, 1.0];
-      for (var rb = 0; rb < PANELS; rb++) {
-        var ang = rb / PANELS * Math.PI * 2;
-        var pts = ribRadii.map(function (v) {
-          // 折痕线在 u=0 处，scallop(0,v) 为尖角；下沉 0.075 藏进伞布内侧，俯视不穿透伞面。
-          var rr = R * v * scallop(0, v) - 0.02;
-          return [rr * Math.cos(ang), canopyY(v) - 0.075, rr * Math.sin(ang)];
-        });
-        g.add(pipe(pts, UM, 0.015, 26));
-        // 副骨撑杆：从中部主骨斜撑向中棒上的滑环，仰视可见三角支撑（参考图细节）。
-        var midV = 0.52, midR = R * midV * scallop(0, midV) - 0.02;
-        var collarY = cy - DROP * 0.72;
-        g.add(pipe([
-          [midR * Math.cos(ang), canopyY(midV) - 0.075, midR * Math.sin(ang)],
-          [midR * 0.52 * Math.cos(ang), (canopyY(midV) + collarY) * 0.5 - 0.075, midR * 0.52 * Math.sin(ang)],
-          [0.075 * Math.cos(ang), collarY, 0.075 * Math.sin(ang)]
-        ], UM, 0.01, 20));
-      }
-      // 中棒：缩短到与伞面协调的比例（顶部≈1.62，底部≈-1.62），避免手柄过长顶到画布底。
+
+      // 中棒 / 滑环 / 伞帽 / J 形握把：固定，不随开合变动
       g.add(mesh(new THREE.CylinderGeometry(0.042, 0.046, 3.24, 14), US, 0, 0, 0));
-      // 滑环开关：中棒上的金属滑套 + 按钮。
       var collarY2 = cy - DROP * 0.72;
       g.add(mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.14, 16), UM, 0, collarY2, 0));
       g.add(mesh(new THREE.BoxGeometry(0.06, 0.1, 0.05), UM, 0, collarY2 + 0.14, 0.07));
-      // 多层金属伞帽：底座圆盘 + 塔身 + 尖顶。
       g.add(mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.06, 18), UM, 0, cy + 0.005, 0));
       g.add(mesh(new THREE.CylinderGeometry(0.095, 0.12, 0.16, 16), UM, 0, cy + 0.11, 0));
       g.add(mesh(new THREE.ConeGeometry(0.055, 0.24, 14), UM, 0, cy + 0.31, 0));
-      // J 形握把：参考实物为扁平宽带（正面宽、侧面薄），顶端有黑色圆柱连接套。
       g.add(mesh(new THREE.CylinderGeometry(0.072, 0.078, 0.2, 16), US, 0, -1.65, 0));
       var handle = pipe([
         [0, -1.69, 0], [0, -1.91, 0], [0.06, -2.13, 0],
         [0.2, -2.25, 0], [0.38, -2.24, 0], [0.5, -2.11, 0], [0.53, -1.93, 0]
       ], US, 0.095, 40);
-      handle.scale.z = 0.42; // 压扁成带宽面朝前的扁带，而非圆管
+      handle.scale.z = 0.42;
       g.add(handle);
+
+      // applyUmbrella(open)：绕各瓣铰链旋转实现开合；open=1 全张，open=CLOSED 收拢
+      function applyUmbrella(open) {
+        open = Math.max(CLOSED, Math.min(1, open));
+        var ang = CLOSE_ANGLE * (1 - open) / (1 - CLOSED);
+        for (var i = 0; i < pivots.length; i++) {
+          pivots[i].quaternion.setFromAxisAngle(pivots[i].userData.axis, ang);
+        }
+        // 收拢过半时隐藏内部撑杆：真实收起的伞看不到撑杆，也避免其穿出伞束成尖刺
+        var showStrut = open > 0.55;
+        for (var s = 0; s < struts.length; s++) struts[s].visible = showStrut;
+      }
+      S.umbrella = { open: 1, target: 1, apply: applyUmbrella, closed: CLOSED };
       return { group: g, shadowY: -2.4, shadowR: 1.85 };
     } else if (pid === 'fan') {
       // v29 折扇：在 v27 真实参考造型基础上加入可交互开合动画。
@@ -932,14 +957,15 @@
     var group = built.group;
     scene.add(group);
 
-    // v29：折扇专属"点击开合"提示（pointer-events:none 不挡操作；切载体时清理）
+    // v29/v30：折扇/晴雨伞"点击开合"提示（pointer-events:none 不挡操作；切载体时清理）
     S.fanHint = null; S.hostPosChanged = false;
-    if (pid === 'fan') {
+    var hintText = pid === 'fan' ? '轻点扇面 · 开合' : (pid === 'umbrella' ? '轻点伞面 · 开合' : null);
+    if (hintText) {
       try {
         var cs = window.getComputedStyle ? window.getComputedStyle(host) : null;
         if (cs && cs.position === 'static') { host.style.position = 'relative'; S.hostPosChanged = true; }
         var hint = document.createElement('div');
-        hint.textContent = '轻点扇面 · 开合';
+        hint.textContent = hintText;
         hint.setAttribute('style', 'position:absolute;right:18px;bottom:70px;' +
           'pointer-events:none;z-index:9;padding:6px 14px;border-radius:999px;' +
           'background:rgba(41,41,41,.72);color:#fff;font:500 12px/1.4 "Noto Sans SC",sans-serif;' +
@@ -1013,11 +1039,13 @@
       S.raf = requestAnimationFrame(loop);
       group.rotation.x += (S.target.rx - group.rotation.x) * 0.14;
       group.rotation.y += (S.target.ry - group.rotation.y) * 0.14;
-      // v29 折扇开合缓动：open 逐帧逼近 target，到位后停算，避免空转。
-      if (S.fan && Math.abs(S.fan.target - S.fan.open) > 0.0008) {
-        S.fan.open += (S.fan.target - S.fan.open) * 0.14;
-        S.fan.apply(S.fan.open);
-      }
+      // v29/v30 折扇、晴雨伞开合缓动：open 逐帧逼近 target，到位后停算，避免空转。
+      [S.fan, S.umbrella].forEach(function (f) {
+        if (f && Math.abs(f.target - f.open) > 0.0008) {
+          f.open += (f.target - f.open) * 0.14;
+          f.apply(f.open);
+        }
+      });
       renderer.render(scene, camera);
     }
     loop();
@@ -1050,7 +1078,7 @@
     if (S.scene) { S.scene.environment = null; }
     if (S.shadowTex) { S.shadowTex.dispose(); S.shadowTex = null; }
     if (S.tex) { S.tex.dispose(); S.tex = null; }
-    S.fan = null;
+    S.fan = null; S.umbrella = null;
     if (S.fanHint && S.fanHint.parentNode) S.fanHint.parentNode.removeChild(S.fanHint);
     S.fanHint = null;
     if (S.hostPosChanged && S.host) S.host.style.position = '';
@@ -1058,18 +1086,27 @@
     S.ready = false; S.host = null; S.group = null;
   }
 
-  // v29：切换折扇开合状态。target 在 1（张开）与 closed（收拢）间切换。
-  function toggleFan() {
-    if (S.productId !== 'fan' || !S.fan) return false;
+  // v29/v30：切换开合状态（折扇/晴雨伞）。target 在 1（张开）与 closed（收拢）间切换。
+  function toggleFold() {
+    var pid = S.productId;
+    var f = pid === 'fan' ? S.fan : (pid === 'umbrella' ? S.umbrella : null);
+    if (!f) return false;
     // 以 target 判定当前意图（动画进行中再次点击也能正确反向）
-    var isOpen = S.fan.target > (1 + S.fan.closed) / 2;
-    S.fan.target = isOpen ? S.fan.closed : 1;
+    var isOpen = f.target > (1 + f.closed) / 2;
+    f.target = isOpen ? f.closed : 1;
     return true;
+  }
+  function toggleFan() { return S.productId === 'fan' ? toggleFold() : false; }
+  function toggleUmbrella() { return S.productId === 'umbrella' ? toggleFold() : false; }
+  function getFoldState() {
+    var f = S.productId === 'fan' ? S.fan : (S.productId === 'umbrella' ? S.umbrella : null);
+    return f ? { open: f.open, target: f.target } : null;
   }
 
   function bindDrag() {
     var canvas = S.renderer.domElement;
-    canvas.style.cursor = (S.productId === 'fan') ? 'pointer' : 'grab';
+    var foldable = (S.productId === 'fan' || S.productId === 'umbrella');
+    canvas.style.cursor = foldable ? 'pointer' : 'grab';
     var downT = 0, moved = 0;
     canvas.addEventListener('pointerdown', function (e) {
       S.drag = true; S.lx = e.clientX; S.ly = e.clientY;
@@ -1090,8 +1127,10 @@
     var up = function () {
       // v29：短按（位移小、时长短）视为点击——折扇触发开合；拖拽旋转不触发。
       var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-      if (S.drag && moved < 8 && (now - downT) < 500 && S.productId === 'fan') toggleFan();
-      S.drag = false; canvas.style.cursor = (S.productId === 'fan') ? 'pointer' : 'grab';
+      if (S.drag && moved < 8 && (now - downT) < 500 &&
+          (S.productId === 'fan' || S.productId === 'umbrella')) toggleFold();
+      S.drag = false;
+      canvas.style.cursor = (S.productId === 'fan' || S.productId === 'umbrella') ? 'pointer' : 'grab';
     };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
@@ -1296,7 +1335,8 @@
     buildArtDataUrl: buildArtDataUrl,
     captureView: captureView, captureThreeViews: captureThreeViews,
     exportScene: exportScene,
-    toggleFan: toggleFan,
-    getFanState: function () { return S.fan ? { open: S.fan.open, target: S.fan.target } : null; }
+    toggleFan: toggleFan, toggleUmbrella: toggleUmbrella,
+    getFanState: function () { return S.fan ? { open: S.fan.open, target: S.fan.target } : null; },
+    getFoldState: getFoldState
   };
 })();
