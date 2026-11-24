@@ -65,7 +65,8 @@
     paperMat: null, elasticMat: null, bookclothMat: null,
     target: { rx: -0.08, ry: -0.32 }, drag: false, lx: 0, ly: 0,
     zoom: 1, baseDist: 8.6,
-    raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null
+    raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null,
+    fan: null
   };
 
   function hex(v) {
@@ -639,23 +640,25 @@
       g.add(handle);
       return { group: g, shadowY: -2.4, shadowR: 1.85 };
     } else if (pid === 'fan') {
-      // v27 按 18 张真实折扇参考重做：
-      // 米白折面（每折独立梯形、山折谷折交替、外缘锯齿尖角）
-      // + 13 根深棕木骨从金扇钉放射 + 外缘两根圆弧大骨 + 扇面只覆盖外段露出内圈骨架。
+      // v29 折扇：在 v27 真实参考造型基础上加入可交互开合动画。
+      // 折面/扇骨的角度由 open 系数驱动（1=完全张开, ~0.12=收拢成细扇），
+      // 点击展示区即缓动切换；所有折面顶点与木骨每帧按 open 重算，纹样 UV 保持不变。
       var FR = 2.72, fcy = -1.5;
       var a0 = Math.PI * 0.13, a1 = Math.PI * 0.87;
       var span = a1 - a0;
       var FOLDS = 13;            // 折数（14 根骨）
       var rIn = 1.16;            // 扇面内缘：内圈露骨架
       var foldAmp = 0.13;        // 折痕起伏振幅
+      var CLOSED = 0.12;         // 闭合时的展开系数（收成细扇，不塌成一条线）
 
       // 折面 z：每折内三角波（中心凸起、折缝回落），相邻折凹凸交替
-      function foldWave(u) {
+      function foldWave(u, open) {
         var p = u * FOLDS;
         var f = p - Math.floor(p);
         var tri = f < 0.5 ? (f * 2) : (2 - f * 2);
         var sgn = (Math.floor(p) % 2 === 0) ? 1 : -1;
-        return sgn * tri * foldAmp;
+        // 收拢时折痕起伏加大，模拟叠扇的层叠厚度；张开时回落到原振幅
+        return sgn * tri * foldAmp * (1 + (1 - open) * 1.4);
       }
       // 外缘半径：折中心尖角最长，折缝略短，形成锯齿山峰
       function outerR(u) {
@@ -664,45 +667,98 @@
         var tri = f < 0.5 ? (f * 2) : (2 - f * 2);
         return FR * (0.93 + 0.07 * tri);
       }
-      // 折面本体（正面纹样 F / 背面纹样 B），u=角度向，v=半径向
-      g.add(gridMesh(130, 14, function (v, u) {
-        var a = a0 + span * u;
-        var ro = outerR(u);
-        var r = rIn + (ro - rIn) * v;
-        var z = foldWave(u) * (0.35 + 0.65 * v);
-        return [r * Math.cos(a), fcy + r * Math.sin(a), z, u, v];
-      }, F));
-      g.add(gridMesh(130, 14, function (v, u) {
-        var a = a0 + span * u;
-        var ro = outerR(u);
-        var r = rIn + (ro - rIn) * v;
-        var z = foldWave(u) * (0.35 + 0.65 * v);
-        return [r * Math.cos(a), fcy + r * Math.sin(a), z - 0.014, 1 - u, v];
-      }, B));
+      // 关键：角度随 open 围绕扇中心收拢/张开。open=1 时为原始 [a0,a1]；
+      // open=CLOSED 时所有折与骨聚拢到中轴附近，形成闭合的细扇束。
+      var aMid = (a0 + a1) / 2;
+      function angleAt(u, open) { return aMid + (a0 + span * u - aMid) * open; }
 
-      // 14 根深棕木骨从金扇钉放射，扇面背后；外侧两根大骨更粗更长、圆弧末端
+      // 可重算的几何对象登记：{ obj, kind, ...}，apply(open) 逐帧更新顶点/变换
+      var fanParts = [];
+      function facePoint(v, u, open) {
+        var a = angleAt(u, open);
+        var ro = outerR(u);
+        var r = rIn + (ro - rIn) * v;
+        var z = foldWave(u, open) * (0.35 + 0.65 * v);
+        return [r * Math.cos(a), fcy + r * Math.sin(a), z];
+      }
+      // 折面本体（正面 F / 背面 B），u=角度向，v=半径向
+      var faceF = gridMesh(130, 14, function (v, u) {
+        var p = facePoint(v, u, 1); return [p[0], p[1], p[2], u, v];
+      }, F);
+      var faceB = gridMesh(130, 14, function (v, u) {
+        var p = facePoint(v, u, 1); return [p[0], p[1], p[2] - 0.014, 1 - u, v];
+      }, B);
+      g.add(faceF); g.add(faceB);
+
+      function registerFace(mesh, cols, rows, back) {
+        fanParts.push({ mesh: mesh, kind: 'face', cols: cols, rows: rows, back: back });
+      }
+      registerFace(faceF, 130, 14, false);
+      registerFace(faceB, 130, 14, true);
+
+      // 14 根深棕木骨 + 外缘大骨圆头，逐根登记便于随 open 收拢
+      var bones = [];
       for (var t = 0; t <= FOLDS; t++) {
-        var ang = a0 + span * t / FOLDS;
         var isEdge = (t === 0 || t === FOLDS);
         var bl = isEdge ? FR * 1.02 : FR * 0.985;
         var bw = isEdge ? 0.062 : 0.03;
-        g.add(mesh(new THREE.BoxGeometry(bl, bw, bw * 0.8), W,
-          bl * 0.5 * Math.cos(ang), fcy + bl * 0.5 * Math.sin(ang), -0.062,
-          0, 0, ang));
-        // 大骨末端圆弧收口
+        var ang = angleAt(t / FOLDS, 1);
+        var bone = mesh(new THREE.BoxGeometry(bl, bw, bw * 0.8), W,
+          bl * 0.5 * Math.cos(ang), fcy + bl * 0.5 * Math.sin(ang), -0.062, 0, 0, ang);
+        g.add(bone);
+        var cap = null;
         if (isEdge) {
-          g.add(mesh(new THREE.SphereGeometry(bw * 0.62, 12, 10), W,
-            bl * Math.cos(ang), fcy + bl * Math.sin(ang), -0.062));
+          cap = mesh(new THREE.SphereGeometry(bw * 0.62, 12, 10), W,
+            bl * Math.cos(ang), fcy + bl * Math.sin(ang), -0.062);
+          g.add(cap);
         }
+        bones.push({ t: t, bl: bl, bone: bone, cap: cap });
       }
-      // 扇面内缘压边（沿 rIn 的细弧），遮住扇面与骨架接缝
-      g.add(gridMesh(60, 1, function (v, u) {
-        var a = a0 + span * u;
+      // 扇面内缘压边（沿 rIn 的细弧）
+      var rim = gridMesh(60, 1, function (v, u) {
+        var a = angleAt(u, 1);
         return [(rIn - 0.02) * Math.cos(a), fcy + (rIn - 0.02) * Math.sin(a), 0.012, u, v];
-      }, D));
-      // 金扇钉 + 扇钉两侧叠合的大骨轴
+      }, D);
+      g.add(rim);
+      fanParts.push({ mesh: rim, kind: 'rim', cols: 60, rows: 1 });
+
+      // 金扇钉 + 扇钉轴（固定不动）
       g.add(mesh(new THREE.SphereGeometry(0.105, 16, 12), A, 0, fcy, -0.085));
       g.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 12), A, 0, fcy, -0.085, Math.PI / 2, 0, 0));
+
+      // applyFan(open)：重算所有折面顶点、扇骨位置/朝向、压边，驱动开合动画
+      function applyFan(open) {
+        open = Math.max(CLOSED, Math.min(1, open));
+        fanParts.forEach(function (part) {
+          var pos = part.mesh.geometry.attributes.position;
+          var arr = pos.array, k = 0;
+          for (var i = 0; i <= part.rows; i++) {
+            for (var j = 0; j <= part.cols; j++) {
+              var vv = i / part.rows, uu = j / part.cols;
+              var x, y, z;
+              if (part.kind === 'face') {
+                var p = facePoint(vv, uu, open);
+                x = p[0]; y = p[1]; z = p[2] - (part.back ? 0.014 : 0);
+              } else { // rim
+                var a = angleAt(uu, open);
+                x = (rIn - 0.02) * Math.cos(a); y = fcy + (rIn - 0.02) * Math.sin(a); z = 0.012;
+              }
+              arr[k++] = x; arr[k++] = y; arr[k++] = z;
+            }
+          }
+          pos.needsUpdate = true;
+          part.mesh.geometry.computeVertexNormals();
+        });
+        bones.forEach(function (b) {
+          var a = angleAt(b.t / FOLDS, open);
+          var ca = Math.cos(a), sa = Math.sin(a);
+          b.bone.position.set(b.bl * 0.5 * ca, fcy + b.bl * 0.5 * sa, -0.062);
+          b.bone.rotation.z = a;
+          if (b.cap) b.cap.position.set(b.bl * ca, fcy + b.bl * sa, -0.062);
+        });
+      }
+      // 挂到 S.fan：loop() 缓动 open 值，toggleFan() 供点击/API 调用
+      S.fan = { open: 1, target: 1, apply: applyFan, closed: CLOSED };
       return { group: g, shadowY: -1.85, shadowR: 1.5 };
 
     } else if (pid === 'hat') {
@@ -876,6 +932,24 @@
     var group = built.group;
     scene.add(group);
 
+    // v29：折扇专属"点击开合"提示（pointer-events:none 不挡操作；切载体时清理）
+    S.fanHint = null; S.hostPosChanged = false;
+    if (pid === 'fan') {
+      try {
+        var cs = window.getComputedStyle ? window.getComputedStyle(host) : null;
+        if (cs && cs.position === 'static') { host.style.position = 'relative'; S.hostPosChanged = true; }
+        var hint = document.createElement('div');
+        hint.textContent = '轻点扇面 · 开合';
+        hint.setAttribute('style', 'position:absolute;right:18px;bottom:70px;' +
+          'pointer-events:none;z-index:9;padding:6px 14px;border-radius:999px;' +
+          'background:rgba(41,41,41,.72);color:#fff;font:500 12px/1.4 "Noto Sans SC",sans-serif;' +
+          'letter-spacing:.08em;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.18);' +
+          'transition:opacity .3s;');
+        host.appendChild(hint);
+        S.fanHint = hint;
+      } catch (e) {}
+    }
+
     // v13 柔和接触阴影：径向渐变的 canvas 贴图替代生硬的纯色椭圆饼，
     // 中心深、边缘自然淡出，更接近产品级渲染的落地阴影。
     var shadow;
@@ -939,6 +1013,11 @@
       S.raf = requestAnimationFrame(loop);
       group.rotation.x += (S.target.rx - group.rotation.x) * 0.14;
       group.rotation.y += (S.target.ry - group.rotation.y) * 0.14;
+      // v29 折扇开合缓动：open 逐帧逼近 target，到位后停算，避免空转。
+      if (S.fan && Math.abs(S.fan.target - S.fan.open) > 0.0008) {
+        S.fan.open += (S.fan.target - S.fan.open) * 0.14;
+        S.fan.apply(S.fan.open);
+      }
       renderer.render(scene, camera);
     }
     loop();
@@ -971,25 +1050,49 @@
     if (S.scene) { S.scene.environment = null; }
     if (S.shadowTex) { S.shadowTex.dispose(); S.shadowTex = null; }
     if (S.tex) { S.tex.dispose(); S.tex = null; }
+    S.fan = null;
+    if (S.fanHint && S.fanHint.parentNode) S.fanHint.parentNode.removeChild(S.fanHint);
+    S.fanHint = null;
+    if (S.hostPosChanged && S.host) S.host.style.position = '';
+    S.hostPosChanged = false;
     S.ready = false; S.host = null; S.group = null;
+  }
+
+  // v29：切换折扇开合状态。target 在 1（张开）与 closed（收拢）间切换。
+  function toggleFan() {
+    if (S.productId !== 'fan' || !S.fan) return false;
+    // 以 target 判定当前意图（动画进行中再次点击也能正确反向）
+    var isOpen = S.fan.target > (1 + S.fan.closed) / 2;
+    S.fan.target = isOpen ? S.fan.closed : 1;
+    return true;
   }
 
   function bindDrag() {
     var canvas = S.renderer.domElement;
-    canvas.style.cursor = 'grab';
+    canvas.style.cursor = (S.productId === 'fan') ? 'pointer' : 'grab';
+    var downT = 0, moved = 0;
     canvas.addEventListener('pointerdown', function (e) {
       S.drag = true; S.lx = e.clientX; S.ly = e.clientY;
+      downT = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      moved = 0;
       canvas.setPointerCapture(e.pointerId);
       canvas.style.cursor = 'grabbing';
     });
     canvas.addEventListener('pointermove', function (e) {
       if (!S.drag) return;
-      S.target.ry += (e.clientX - S.lx) * 0.009;
-      S.target.rx += (e.clientY - S.ly) * 0.008;
+      var ddx = e.clientX - S.lx, ddy = e.clientY - S.ly;
+      moved += Math.abs(ddx) + Math.abs(ddy);
+      S.target.ry += ddx * 0.009;
+      S.target.rx += ddy * 0.008;
       S.target.rx = Math.max(-1.2, Math.min(1.2, S.target.rx));
       S.lx = e.clientX; S.ly = e.clientY;
     });
-    var up = function () { S.drag = false; canvas.style.cursor = 'grab'; };
+    var up = function () {
+      // v29：短按（位移小、时长短）视为点击——折扇触发开合；拖拽旋转不触发。
+      var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      if (S.drag && moved < 8 && (now - downT) < 500 && S.productId === 'fan') toggleFan();
+      S.drag = false; canvas.style.cursor = (S.productId === 'fan') ? 'pointer' : 'grab';
+    };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
     // v23 桌面：鼠标滚轮放大 / 缩小（向下滚缩小，向上滚放大）
@@ -1192,6 +1295,8 @@
     init: init, update: update, dispose: dispose, view: view,
     buildArtDataUrl: buildArtDataUrl,
     captureView: captureView, captureThreeViews: captureThreeViews,
-    exportScene: exportScene
+    exportScene: exportScene,
+    toggleFan: toggleFan,
+    getFanState: function () { return S.fan ? { open: S.fan.open, target: S.fan.target } : null; }
   };
 })();
