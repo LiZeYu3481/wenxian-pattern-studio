@@ -1119,9 +1119,12 @@
       if (!S.drag) return;
       var ddx = e.clientX - S.lx, ddy = e.clientY - S.ly;
       moved += Math.abs(ddx) + Math.abs(ddy);
-      S.target.ry += ddx * 0.009;
+      S.target.ry += ddx * 0.009; // 水平无限制：可无限累加，360° 自由环绕
       S.target.rx += ddy * 0.008;
-      S.target.rx = Math.max(-1.2, Math.min(1.2, S.target.rx));
+      // v31：解除垂直死角——放宽到接近 ±90°（从正顶看到正底），配合水平无限旋转实现全方位无死角。
+      // 保留 0.02rad 余量避开 ±90° 欧拉角奇点（避免万向节死锁导致画面突然上下翻转）。
+      var RX_LIMIT = Math.PI / 2 - 0.02;
+      S.target.rx = Math.max(-RX_LIMIT, Math.min(RX_LIMIT, S.target.rx));
       S.lx = e.clientX; S.ly = e.clientY;
     });
     var up = function () {
@@ -1337,6 +1340,13 @@
     exportScene: exportScene,
     toggleFan: toggleFan, toggleUmbrella: toggleUmbrella,
     getFanState: function () { return S.fan ? { open: S.fan.open, target: S.fan.target } : null; },
-    getFoldState: getFoldState
+    getFoldState: getFoldState,
+    getRotation: function () {
+      var g = S.group;
+      return {
+        rx: g ? g.rotation.x : null, ry: g ? g.rotation.y : null,
+        targetRx: S.target ? S.target.rx : null, targetRy: S.target ? S.target.ry : null
+      };
+    }
   };
 })();
