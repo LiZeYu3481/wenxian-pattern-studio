@@ -66,7 +66,7 @@
     target: { rx: -0.08, ry: -0.32 }, drag: false, lx: 0, ly: 0,
     zoom: 1, baseDist: 8.6,
     raf: null, tex: null, envRT: null, shadowTex: null, ro: null, opts: null, ready: false, productId: null,
-    fan: null, umbrella: null
+    fan: null
   };
 
   function hex(v) {
@@ -577,93 +577,6 @@
       g.add(mesh(new THREE.BoxGeometry(0.1, 0.12, 0.02), BC, RX, NH / 2 + 0.02, ribbonZ - 0.01));
       return { group: g, shadowY: -2.0, shadowR: 1.5 };
 
-    } else if (pid === 'umbrella') {
-      // 晴雨伞（v30：加入点击开合动画）：8 瓣伞布 + 主骨 + 副骨各自装入一个以伞顶为铰链的
-      // pivot 组，收伞时整瓣绕铰链向下折拢成细束；中棒/滑环/伞帽/握把固定不动。
-      // 张开态几何与 v19 完全一致（顶点相对伞顶建，pivot 放回伞顶，净坐标不变）。
-      var R = 1.95, cy = 1.62, PANELS = 8, DROP = 0.98;
-      var UM = M.umbrellaMetal, US = M.umbrellaShaft;
-      var CLOSE_ANGLE = -1.02;   // 收伞时每瓣向下折的角度（弧度）：伞缘收成一束、不共面闪烁
-      var CLOSED = 0.12;         // 闭合时的展开系数
-
-      function canopyY(v) { return cy - DROP * Math.pow(v, 1.55); }
-      function scallop(u, v) { return 1 - 0.035 * Math.cos((u - 0.5) * Math.PI * 2) * Math.pow(v, 3); }
-
-      // 每瓣一个铰链组：轴 = 垂直于该瓣径向的水平向量；顶点以伞顶为原点建立。
-      var pivots = [];
-      var struts = [];           // 副骨撑杆：收伞时淡出（真实收起的伞看不到内部撑杆）
-      var ribRadii = [0.0, 0.26, 0.52, 0.78, 1.0];
-      for (var pn = 0; pn < PANELS; pn++) {
-        (function (idx) {
-          var a0 = idx / PANELS * Math.PI * 2, a1 = (idx + 1) / PANELS * Math.PI * 2;
-          var angMid = (idx + 0.5) / PANELS * Math.PI * 2;
-          var axis = new THREE.Vector3(-Math.sin(angMid), 0, Math.cos(angMid)).normalize();
-          var pv = new THREE.Group();
-          pv.position.set(0, cy, 0);
-          pv.userData.axis = axis;
-          g.add(pv);
-          pivots.push(pv);
-
-          // 伞布片（y 相对伞顶）
-          pv.add(gridMesh(12, 12, function (v, u) {
-            var ang = a0 + (a1 - a0) * u;
-            var rr = R * v * scallop(u, v);
-            var yy = canopyY(v) - cy;
-            yy -= 0.035 * Math.sin(u * Math.PI) * Math.pow(v, 1.1);
-            return [rr * Math.cos(ang), yy, rr * Math.sin(ang),
-              idx / PANELS + u / PANELS, v];
-          }, F));
-
-          // 主骨（沿瓣分缝，折痕线在 u=0）
-          var angR = idx / PANELS * Math.PI * 2;
-          var pts = ribRadii.map(function (v) {
-            var rr = R * v * scallop(0, v) - 0.02;
-            return [rr * Math.cos(angR), canopyY(v) - 0.075 - cy, rr * Math.sin(angR)];
-          });
-          pv.add(pipe(pts, UM, 0.015, 26));
-
-          // 副骨撑杆：主骨中部斜撑向中棒滑环
-          var midV = 0.52, midR = R * midV * scallop(0, midV) - 0.02;
-          var collarY = cy - DROP * 0.72;
-          var strut = pipe([
-            [midR * Math.cos(angR), canopyY(midV) - 0.075 - cy, midR * Math.sin(angR)],
-            [midR * 0.52 * Math.cos(angR), (canopyY(midV) + collarY) * 0.5 - 0.075 - cy, midR * 0.52 * Math.sin(angR)],
-            [0.075 * Math.cos(angR), collarY - cy, 0.075 * Math.sin(angR)]
-          ], UM, 0.01, 20);
-          pv.add(strut);
-          struts.push(strut);
-        })(pn);
-      }
-
-      // 中棒 / 滑环 / 伞帽 / J 形握把：固定，不随开合变动
-      g.add(mesh(new THREE.CylinderGeometry(0.042, 0.046, 3.24, 14), US, 0, 0, 0));
-      var collarY2 = cy - DROP * 0.72;
-      g.add(mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.14, 16), UM, 0, collarY2, 0));
-      g.add(mesh(new THREE.BoxGeometry(0.06, 0.1, 0.05), UM, 0, collarY2 + 0.14, 0.07));
-      g.add(mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.06, 18), UM, 0, cy + 0.005, 0));
-      g.add(mesh(new THREE.CylinderGeometry(0.095, 0.12, 0.16, 16), UM, 0, cy + 0.11, 0));
-      g.add(mesh(new THREE.ConeGeometry(0.055, 0.24, 14), UM, 0, cy + 0.31, 0));
-      g.add(mesh(new THREE.CylinderGeometry(0.072, 0.078, 0.2, 16), US, 0, -1.65, 0));
-      var handle = pipe([
-        [0, -1.69, 0], [0, -1.91, 0], [0.06, -2.13, 0],
-        [0.2, -2.25, 0], [0.38, -2.24, 0], [0.5, -2.11, 0], [0.53, -1.93, 0]
-      ], US, 0.095, 40);
-      handle.scale.z = 0.42;
-      g.add(handle);
-
-      // applyUmbrella(open)：绕各瓣铰链旋转实现开合；open=1 全张，open=CLOSED 收拢
-      function applyUmbrella(open) {
-        open = Math.max(CLOSED, Math.min(1, open));
-        var ang = CLOSE_ANGLE * (1 - open) / (1 - CLOSED);
-        for (var i = 0; i < pivots.length; i++) {
-          pivots[i].quaternion.setFromAxisAngle(pivots[i].userData.axis, ang);
-        }
-        // 收拢过半时隐藏内部撑杆：真实收起的伞看不到撑杆，也避免其穿出伞束成尖刺
-        var showStrut = open > 0.55;
-        for (var s = 0; s < struts.length; s++) struts[s].visible = showStrut;
-      }
-      S.umbrella = { open: 1, target: 1, apply: applyUmbrella, closed: CLOSED };
-      return { group: g, shadowY: -2.4, shadowR: 1.85 };
     } else if (pid === 'fan') {
       // v29 折扇：在 v27 真实参考造型基础上加入可交互开合动画。
       // 折面/扇骨的角度由 open 系数驱动（1=完全张开, ~0.12=收拢成细扇），
@@ -842,30 +755,6 @@
         g.add(mesh(new THREE.TorusGeometry(rr, 0.012, 6, 72), C, 0, -0.66 - (rr - 0.99) * 0.34, 0, Math.PI / 2));
       });
       return { group: g, shadowY: -1.08, shadowR: 1.85 };
-    } else if (pid === 'teapot') {
-      // 茶壶：圆润壶腹车削 + 壶盖提钮 + 壶嘴 + 环形把手，壶身满印
-      var tp = [
-        [0.0,-1.15],[0.5,-1.15],[0.72,-1.08],[0.92,-0.86],[1.08,-0.5],
-        [1.14,-0.12],[1.08,0.24],[0.9,0.55],[0.66,0.72],[0.58,0.78]
-      ];
-      var tg = new THREE.LatheGeometry(tp.map(function(q){return new THREE.Vector2(q[0],q[1]);}),64);
-      latheSideUV(tg,2.2,1.0); g.add(mesh(tg,F));
-      // 内壁深色
-      g.add(mesh(new THREE.LatheGeometry([[0.56,0.78],[0.52,0.5],[0.4,0.0],[0.2,-0.6],[0,-0.9]].map(function(q){return new THREE.Vector2(q[0],q[1]);}),40),I));
-      // 壶盖：微拱盖片 + 盖沿 + 提钮
-      g.add(mesh(new THREE.SphereGeometry(0.6,40,16,0,Math.PI*2,0,Math.PI/2.6),F,0,0.78,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.62,0.6,0.07,48),D,0,0.79,0));
-      g.add(mesh(new THREE.SphereGeometry(0.15,20,14),A,0,1.08,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.05,0.06,0.12,16),A,0,0.98,0));
-      // 壶嘴：从壶肩斜向上外伸的锥管
-      var spout = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.2,0.95,20,1,true),F);
-      spout.position.set(1.02,0.28,0); spout.rotation.z=-0.85; g.add(spout);
-      g.add(mesh(new THREE.TorusGeometry(0.12,0.028,8,20),A,1.42,0.63,0,0,Math.PI/2));
-      // 环形把手：壶身另一侧的大 C 形耳柄
-      g.add(pipe([[-0.95,0.5,0],[-1.45,0.55,0],[-1.75,0.15,0],[-1.62,-0.4,0],[-1.12,-0.62,0]],D,0.075,40));
-      // 圈足
-      g.add(mesh(new THREE.CylinderGeometry(0.5,0.5,0.08,40),D,0,-1.18,0));
-      return { group: g, shadowY: -1.32, shadowR: 1.6 };
 
     } else if (pid === 'teacup') {
       // 品茗杯：小巧敞口杯，外壁满印、内壁深色、圈足
@@ -877,17 +766,6 @@
       g.add(mesh(new THREE.CylinderGeometry(0.34,0.32,0.07,40),C,0,-0.75,0));
       return { group: g, shadowY: -0.86, shadowR: 1.05 };
 
-    } else if (pid === 'candle') {
-      // 香薰蜡烛：玻璃杯身满印 + 蜡面 + 烛芯 + 火苗
-      g.add(mesh(new THREE.CylinderGeometry(0.82,0.76,1.9,56,1,true),F));
-      g.add(mesh(new THREE.CylinderGeometry(0.76,0.76,0.06,48),F,0,0.95,0));
-      g.add(mesh(new THREE.CircleGeometry(0.74,48),C,0,0.96,0,Math.PI/2));
-      g.add(mesh(new THREE.CylinderGeometry(0.02,0.02,0.18,8),D,0,1.04,0));
-      var flame = mesh(new THREE.SphereGeometry(0.1,16,12),A,0,1.2,0);
-      flame.scale.set(0.7,1.7,0.7); g.add(flame);
-      g.add(mesh(new THREE.TorusGeometry(0.81,0.035,10,48),A,0,0.96,0,Math.PI/2));
-      g.add(mesh(new THREE.CylinderGeometry(0.78,0.78,0.07,48),D,0,-0.95,0));
-      return { group: g, shadowY: -1.05, shadowR: 1.1 };
 
     } else if (pid === 'bowl') {
       // 汤碗：敞口弧腹碗，外壁满印、内壁也印、圈足
@@ -901,17 +779,6 @@
       g.add(mesh(new THREE.CylinderGeometry(0.5,0.48,0.1,48),D,0,-0.68,0));
       return { group: g, shadowY: -0.78, shadowR: 1.45 };
 
-    } else if (pid === 'teaJar') {
-      // 茶叶罐：圆柱罐身满印 + 密封盖 + 描金圈 + 提钮
-      g.add(mesh(new THREE.CylinderGeometry(0.86,0.86,2.1,56),F));
-      g.add(mesh(new THREE.CylinderGeometry(0.9,0.9,0.16,56),D,0,1.13,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.82,0.82,0.1,56),A,0,1.24,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.5,0.56,0.16,48),F,0,1.32,0));
-      g.add(mesh(new THREE.SphereGeometry(0.13,16,12),A,0,1.45,0));
-      g.add(mesh(new THREE.TorusGeometry(0.865,0.02,8,56),A,0,0.7,0,Math.PI/2));
-      g.add(mesh(new THREE.TorusGeometry(0.865,0.02,8,56),A,0,-0.7,0,Math.PI/2));
-      g.add(mesh(new THREE.CylinderGeometry(0.86,0.86,0.08,56),D,0,-1.09,0));
-      return { group: g, shadowY: -1.14, shadowR: 1.1 };
 
     } else if (pid === 'planter') {
       // 花盆：上宽下窄切割锥台满印 + 外翻盆沿 + 泥土 + 绿叶
@@ -928,36 +795,7 @@
       });
       return { group: g, shadowY: -0.92, shadowR: 1.2 };
 
-    } else if (pid === 'pencilHolder') {
-      // 笔筒：圆柱筒身满印 + 内腔深色 + 底 + 几支铅笔
-      g.add(mesh(new THREE.CylinderGeometry(0.66,0.66,1.85,48,1,true),F));
-      g.add(mesh(new THREE.CylinderGeometry(0.6,0.6,1.8,48,1,true),I));
-      g.add(mesh(new THREE.CircleGeometry(0.6,48),I,0,-0.9,0,Math.PI/2));
-      g.add(mesh(new THREE.TorusGeometry(0.66,0.035,10,48),A,0,0.925,0,Math.PI/2));
-      g.add(mesh(new THREE.CylinderGeometry(0.66,0.66,0.08,48),D,0,-0.93,0));
-      // 铅笔（六棱杆 + 笔尖）
-      [[-0.2,0.28,0.05],[0.15,0.4,-0.1],[0.28,0.2,0.2],[-0.05,0.5,0.25]].forEach(function(p,idx){
-        var colors=[0xc0392b,0x2980b9,0xd4ac0d,0x27ae60];
-        var pm=new THREE.MeshStandardMaterial({color:colors[idx],roughness:0.7});
-        g.add(mesh(new THREE.CylinderGeometry(0.06,0.06,1.5,6),pm,p[0],p[1]+0.3,p[2],0,0,(idx-1.5)*0.06));
-        g.add(mesh(new THREE.ConeGeometry(0.06,0.22,6),C,p[0],p[1]+1.16,p[2],0,0,(idx-1.5)*0.06));
-      });
-      return { group: g, shadowY: -1.0, shadowR: 0.95 };
 
-    } else if (pid === 'tumbler') {
-      // 随行杯：高瘦杯身满印 + 锥盖 + 吸管 + 提环
-      var tu=new THREE.CylinderGeometry(0.62,0.5,2.5,56,1,true);
-      scaleUV(tu,2.2,1.0); g.add(mesh(tu,F));
-      g.add(mesh(new THREE.CylinderGeometry(0.62,0.5,0.08,56),D,0,-1.25,0));
-      // 杯盖：锥形 + 顶台
-      g.add(mesh(new THREE.CylinderGeometry(0.66,0.63,0.16,56),D,0,1.32,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.4,0.66,0.3,56),D,0,1.52,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.34,0.34,0.06,48),A,0,1.68,0));
-      // 吸管
-      g.add(mesh(new THREE.CylinderGeometry(0.055,0.055,0.7,16),A,0.2,1.95,0,0,0,0.2));
-      // 提环
-      g.add(mesh(new THREE.TorusGeometry(0.28,0.035,8,28),D,0,1.82,0,Math.PI/2));
-      return { group: g, shadowY: -1.32, shadowR: 0.95 };
 
     } else if (pid === 'perfume') {
       // 香水瓶：圆角方瓶身满印 + 肩 + 颈 + 喷头 + 方盖
@@ -1000,19 +838,6 @@
       g.add(mesh(new THREE.BoxGeometry(0.5,0.5,0.02),M.paperMat,0.05,1.28,0,0.1,0.2,0.15));
       return { group: g, shadowY: -0.85, shadowR: 1.85 };
 
-    } else if (pid === 'lantern') {
-      // 宫灯：六角灯罩满印 + 上下盖 + 提梁 + 流苏
-      var lant=new THREE.CylinderGeometry(0.95,0.95,1.9,6,1,true);
-      scaleUV(lant,1.5,1.0); g.add(mesh(lant,F,0,0,0,0,Math.PI/6,0));
-      // 六根竖向骨架
-      for(var li=0;li<6;li++){var a=li/6*Math.PI*2+Math.PI/6;g.add(mesh(new THREE.BoxGeometry(0.05,1.92,0.05),W,0.95*Math.cos(a),0,0.95*Math.sin(a)));}
-      g.add(mesh(new THREE.CylinderGeometry(1.0,1.0,0.14,6),W,0,0.98,0,0,Math.PI/6,0));
-      g.add(mesh(new THREE.CylinderGeometry(1.0,1.0,0.14,6),W,0,-0.98,0,0,Math.PI/6,0));
-      g.add(mesh(new THREE.TorusGeometry(0.5,0.035,8,24),A,0,1.45,0,Math.PI/2));
-      g.add(pipe([[0,1.05,0],[0,1.5,0]],D,0.02,10));
-      // 底部流苏
-      for(var t2=-2;t2<=2;t2++){g.add(pipe([[t2*0.08,-1.05,0],[t2*0.1,-1.4,0],[t2*0.12,-1.7,0]],A,0.014,12));}
-      return { group: g, shadowY: -1.85, shadowR: 1.2 };
 
     } else if (pid === 'lamp') {
       // 台灯：锥形布艺灯罩满印 + 灯杆 + 圆盘底座
@@ -1027,78 +852,9 @@
       g.add(mesh(new THREE.CylinderGeometry(0.4,0.5,0.1,40),A,0,-0.4,0));
       return { group: g, shadowY: -0.56, shadowR: 1.3 };
 
-    } else if (pid === 'tray') {
-      // 托盘：圆形浅盘，盘面满印（平铺 UV）+ 上翘盘沿 + 描金边 + 两侧提耳
-      var trayProf=[
-        new THREE.Vector2(0,0),new THREE.Vector2(0.9,0.0),new THREE.Vector2(1.5,0.02),
-        new THREE.Vector2(1.72,0.16),new THREE.Vector2(1.75,0.2),new THREE.Vector2(1.7,0.2),
-        new THREE.Vector2(1.45,0.08),new THREE.Vector2(0.9,-0.06),new THREE.Vector2(0.85,-0.14),new THREE.Vector2(0.7,-0.14)
-      ];
-      g.add(lathe(trayProf,F,64,true,3.6));
-      g.add(mesh(new THREE.TorusGeometry(1.72,0.028,8,64),A,0,0.19,0,Math.PI/2));
-      [-1,1].forEach(function(s){
-        g.add(mesh(new THREE.TorusGeometry(0.22,0.045,10,24),A,s*1.9,0.1,0,Math.PI/2));
-      });
-      return { group: g, shadowY: -0.25, shadowR: 1.95 };
 
-    } else if (pid === 'baseballCap') {
-      // 棒球帽：半球帽冠满印 + 弧形帽檐 + 顶扣 + 分缝
-      var crown=new THREE.SphereGeometry(1.12,48,24,0,Math.PI*2,0,Math.PI/2.1);
-      var cg2=crown.attributes.uv;
-      g.add(mesh(crown,F,0,0.1,0));
-      // 帽冠底圈
-      g.add(mesh(new THREE.CylinderGeometry(1.12,1.1,0.16,48,1,true),F,0,0.02,0));
-      // 帽檐：前方伸出的扁弧面
-      var brim=new THREE.SphereGeometry(1.15,40,16,0,Math.PI,Math.PI/2-0.28,0.3);
-      var bm=mesh(brim,F,0,0.0,0); bm.scale.set(1,0.12,1.05); bm.rotation.x=-0.12; g.add(bm);
-      g.add(mesh(new THREE.SphereGeometry(0.09,16,12),A,0,1.2,0));
-      // 顶部分缝
-      g.add(pipe([[0,1.2,0],[0,0.75,1.05],[0,0.15,1.12]],D,0.012,20));
-      return { group: g, shadowY: -0.2, shadowR: 1.35 };
 
-    } else if (pid === 'canvasBag') {
-      // 帆布袋：鼓起的立体袋身（正背满印）+ 袋口 + 两条扁带提手
-      var BW=1.55,BH=1.7;
-      function bagZ(u,v){var e=Math.abs(u-0.5)*2,t=Math.abs(v-0.5)*2;return 0.28*(1-0.35*Math.pow(e,3))*(1-0.3*Math.pow(t,4))+0.02*Math.sin(u*12)*Math.sin(v*8);}
-      g.add(gridMesh(40,32,function(v,u){return [(u-0.5)*2*BW,(v-0.5)*2*BH,bagZ(u,v),u,v];},F));
-      g.add(gridMesh(40,32,function(v,u){return [(u-0.5)*2*BW,(v-0.5)*2*BH,-bagZ(u,v),1-u,v];},B));
-      // 侧围
-      var bagLoop=[];
-      for(var be=0;be<=96;be++){var bt=be/96;
-        if(bt<=0.25)bagLoop.push([bt*4,0]);else if(bt<=0.5)bagLoop.push([1,(bt-0.25)*4]);
-        else if(bt<=0.75)bagLoop.push([1-(bt-0.5)*4,1]);else bagLoop.push([0,1-(bt-0.75)*4]);}
-      g.add(gridMesh(96,5,function(w,t){var uv2=bagLoop[Math.min(96,Math.round(t*96))];return [(uv2[0]-0.5)*2*BW,(uv2[1]-0.5)*2*BH,bagZ(uv2[0],uv2[1])*(1-2*w),t*3,w*0.5];},C));
-      // 袋口卷边
-      var topEdge=[];
-      for(var te=0;te<=40;te++){var tu2=te/40;topEdge.push([(tu2-0.5)*2*BW,BH,bagZ(tu2,1)]);}
-      g.add(pipe(topEdge,C,0.035,64));
-      // 两条提手
-      [-0.7,0.7].forEach(function(hx){
-        g.add(pipe([[hx,BH-0.05,0.02],[hx,BH+0.55,0],[hx,BH-0.05,-0.02]],C,0.055,32));
-      });
-      return { group: g, shadowY: -1.85, shadowR: 1.7 };
 
-    } else if (pid === 'socks') {
-      // 袜子：两只立体袜（袜筒 + 弯折袜脚），袜身满印
-      function makeSock(ox,tilt){
-        var sg=new THREE.Group();
-        // 袜筒（上宽下略收的圆柱）
-        var leg=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.36,1.7,32,1,true),F);
-        leg.position.set(0,0.6,0); sg.add(leg);
-        sg.add(mesh(new THREE.TorusGeometry(0.42,0.06,10,32),C,0,1.45,0,Math.PI/2));
-        sg.add(mesh(new THREE.CircleGeometry(0.36,32),C,0,-0.25,0,Math.PI/2));
-        // 袜脚：横向的半椭球 + 脚尖
-        var foot=mesh(new THREE.SphereGeometry(0.4,28,18),F,0.42,-0.35,0);
-        foot.scale.set(1.7,0.72,0.95); sg.add(foot);
-        var toe=mesh(new THREE.SphereGeometry(0.36,24,16),F,1.1,-0.42,0);
-        toe.scale.set(1.0,0.7,0.9); sg.add(toe);
-        // 脚跟
-        sg.add(mesh(new THREE.SphereGeometry(0.34,20,14),C,-0.28,-0.42,0));
-        sg.position.set(ox,0.35,0); sg.rotation.z=tilt; return sg;
-      }
-      g.add(makeSock(-0.62,0.14));
-      g.add(makeSock(0.62,-0.14));
-      return { group: g, shadowY: -0.55, shadowR: 1.7 };
 
     } else if (pid === 'luggage') {
       // 行李箱：圆角硬壳箱体满印 + 中缝拉链 + 提手 + 拉杆 + 万向轮
@@ -1118,35 +874,7 @@
       [[-0.9,-1.65],[0.9,-1.65]].forEach(function(p){g.add(mesh(new THREE.CylinderGeometry(0.18,0.18,0.14,20),D,p[0],p[1],0,0,0,Math.PI/2));});
       return { group: g, shadowY: -1.85, shadowR: 1.9 };
 
-    } else if (pid === 'speaker') {
-      // 蓝牙音箱：圆柱布艺网罩无缝环绕满印 + 金属顶盖 + 按键 + 底环
-      var spk=new THREE.CylinderGeometry(0.75,0.75,2.0,64,1,true);
-      scaleUV(spk,2.4,1.0); g.add(mesh(spk,F));
-      g.add(mesh(new THREE.CylinderGeometry(0.76,0.76,0.12,56),M.umbrellaMetal,0,1.0,0));
-      g.add(mesh(new THREE.CircleGeometry(0.7,48),M.umbrellaMetal,0,1.07,0,Math.PI/2));
-      // 顶部触控键
-      [[-0.3,0],[0,0],[0.3,0]].forEach(function(p,idx){
-        g.add(mesh(new THREE.CircleGeometry(0.09,20),idx===1?D:M.umbrellaShaft,p[0],1.075,p[1],Math.PI/2));
-      });
-      g.add(mesh(new THREE.TorusGeometry(0.76,0.03,10,56),D,0,-0.9,0,Math.PI/2));
-      g.add(mesh(new THREE.CylinderGeometry(0.76,0.76,0.08,56),D,0,-1.0,0));
-      return { group: g, shadowY: -1.08, shadowR: 1.0 };
 
-    } else if (pid === 'tableClock') {
-      // 座钟：圆形钟面满印 + 金属外壳 + 刻度 + 指针 + 底座
-      g.add(mesh(new THREE.CylinderGeometry(1.2,1.2,0.24,56),A,0,0.55,0,Math.PI/2));
-      g.add(mesh(new THREE.CircleGeometry(1.08,56),F,0,0.69,0,Math.PI/2));
-      // 刻度
-      for(var ki=0;ki<12;ki++){var ka=ki/12*Math.PI*2;
-        g.add(mesh(new THREE.BoxGeometry(0.05,0.16,0.02),D,0.86*Math.sin(ka),0.55+0.86*Math.cos(ka),0.7,0,0,-ka));}
-      // 指针
-      g.add(mesh(new THREE.BoxGeometry(0.06,0.62,0.02),D,0.2,0.85,0.72,0,0,-0.35));
-      g.add(mesh(new THREE.BoxGeometry(0.05,0.9,0.02),D,-0.25,0.78,0.72,0,0,0.5));
-      g.add(mesh(new THREE.SphereGeometry(0.09,16,12),A,0,0.55,0.74));
-      // 支柱 + 底座
-      g.add(mesh(new THREE.CylinderGeometry(0.1,0.12,0.6,20),A,0,-0.35,0));
-      g.add(mesh(new THREE.CylinderGeometry(0.7,0.8,0.16,48),W,0,-0.72,0));
-      return { group: g, shadowY: -0.82, shadowR: 1.1 };
 
     }
 
@@ -1248,8 +976,7 @@
     };
 
     // 陶瓷（马克杯/瓷盘）：哑光釉面 roughness≈0.75（网络规范 0.7–0.9），非塑料高光。
-    if (pid === 'mug' || pid === 'plate' || pid === 'teapot' || pid === 'teacup' || pid === 'bowl' ||
-        pid === 'candle' || pid === 'teaJar' || pid === 'pencilHolder' || pid === 'planter') {
+    if (pid === 'mug' || pid === 'plate' || pid === 'teacup' || pid === 'bowl' || pid === 'planter') {
       M.frontMat.roughness = 0.72; M.frontMat.metalness = 0.02; M.frontMat.envMapIntensity = 0.85;
       M.sideMat.roughness = 0.74; M.sideMat.envMapIntensity = 0.8;
       M.innerMat.roughness = 0.68; M.innerMat.envMapIntensity = 0.7;
@@ -1266,7 +993,7 @@
 
     // v29/v30：折扇/晴雨伞"点击开合"提示（pointer-events:none 不挡操作；切载体时清理）
     S.fanHint = null; S.hostPosChanged = false;
-    var hintText = pid === 'fan' ? '轻点扇面 · 开合' : (pid === 'umbrella' ? '轻点伞面 · 开合' : null);
+    var hintText = pid === 'fan' ? '轻点扇面 · 开合' : null;
     if (hintText) {
       try {
         var cs = window.getComputedStyle ? window.getComputedStyle(host) : null;
@@ -1314,9 +1041,9 @@
 
     // 初始视角：给足俯角与侧转，第一眼就能看出立体体积（而非一条平边）。
     // 平铺类（瓷盘/地毯/方巾）俯角更大；其余载体用中等俯角展现厚度与顶部细节。
-    if (pid === 'plate' || pid === 'rug' || pid === 'scarf' || pid === 'tray') {
+    if (pid === 'plate' || pid === 'rug' || pid === 'scarf') {
       S.target.rx = -0.62; S.target.ry = -0.34;
-    } else if (pid === 'umbrella' || pid === 'fan') {
+    } else if (pid === 'fan') {
       S.target.rx = -0.16; S.target.ry = -0.3;
     } else {
       S.target.rx = -0.26; S.target.ry = -0.34;
@@ -1346,13 +1073,11 @@
       S.raf = requestAnimationFrame(loop);
       group.rotation.x += (S.target.rx - group.rotation.x) * 0.14;
       group.rotation.y += (S.target.ry - group.rotation.y) * 0.14;
-      // v29/v30 折扇、晴雨伞开合缓动：open 逐帧逼近 target，到位后停算，避免空转。
-      [S.fan, S.umbrella].forEach(function (f) {
-        if (f && Math.abs(f.target - f.open) > 0.0008) {
-          f.open += (f.target - f.open) * 0.14;
-          f.apply(f.open);
-        }
-      });
+      // v29 折扇开合缓动：open 逐帧逼近 target，到位后停算，避免空转。
+      if (S.fan && Math.abs(S.fan.target - S.fan.open) > 0.0008) {
+        S.fan.open += (S.fan.target - S.fan.open) * 0.14;
+        S.fan.apply(S.fan.open);
+      }
       renderer.render(scene, camera);
     }
     loop();
@@ -1385,7 +1110,7 @@
     if (S.scene) { S.scene.environment = null; }
     if (S.shadowTex) { S.shadowTex.dispose(); S.shadowTex = null; }
     if (S.tex) { S.tex.dispose(); S.tex = null; }
-    S.fan = null; S.umbrella = null;
+    S.fan = null;
     if (S.fanHint && S.fanHint.parentNode) S.fanHint.parentNode.removeChild(S.fanHint);
     S.fanHint = null;
     if (S.hostPosChanged && S.host) S.host.style.position = '';
@@ -1393,26 +1118,23 @@
     S.ready = false; S.host = null; S.group = null;
   }
 
-  // v29/v30：切换开合状态（折扇/晴雨伞）。target 在 1（张开）与 closed（收拢）间切换。
+  // v29：切换折扇开合状态。target 在 1（张开）与 closed（收拢）间切换。
   function toggleFold() {
-    var pid = S.productId;
-    var f = pid === 'fan' ? S.fan : (pid === 'umbrella' ? S.umbrella : null);
-    if (!f) return false;
+    var f = S.fan;
+    if (!f || S.productId !== 'fan') return false;
     // 以 target 判定当前意图（动画进行中再次点击也能正确反向）
     var isOpen = f.target > (1 + f.closed) / 2;
     f.target = isOpen ? f.closed : 1;
     return true;
   }
-  function toggleFan() { return S.productId === 'fan' ? toggleFold() : false; }
-  function toggleUmbrella() { return S.productId === 'umbrella' ? toggleFold() : false; }
+  function toggleFan() { return toggleFold(); }
   function getFoldState() {
-    var f = S.productId === 'fan' ? S.fan : (S.productId === 'umbrella' ? S.umbrella : null);
-    return f ? { open: f.open, target: f.target } : null;
+    return S.fan ? { open: S.fan.open, target: S.fan.target } : null;
   }
 
   function bindDrag() {
     var canvas = S.renderer.domElement;
-    var foldable = (S.productId === 'fan' || S.productId === 'umbrella');
+    var foldable = (S.productId === 'fan');
     canvas.style.cursor = foldable ? 'pointer' : 'grab';
     var downT = 0, moved = 0;
     canvas.addEventListener('pointerdown', function (e) {
@@ -1438,9 +1160,9 @@
       // v29：短按（位移小、时长短）视为点击——折扇触发开合；拖拽旋转不触发。
       var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       if (S.drag && moved < 8 && (now - downT) < 500 &&
-          (S.productId === 'fan' || S.productId === 'umbrella')) toggleFold();
+          S.productId === 'fan') toggleFold();
       S.drag = false;
-      canvas.style.cursor = (S.productId === 'fan' || S.productId === 'umbrella') ? 'pointer' : 'grab';
+      canvas.style.cursor = (S.productId === 'fan') ? 'pointer' : 'grab';
     };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
@@ -1645,7 +1367,7 @@
     buildArtDataUrl: buildArtDataUrl,
     captureView: captureView, captureThreeViews: captureThreeViews,
     exportScene: exportScene,
-    toggleFan: toggleFan, toggleUmbrella: toggleUmbrella,
+    toggleFan: toggleFan,
     getFanState: function () { return S.fan ? { open: S.fan.open, target: S.fan.target } : null; },
     getFoldState: getFoldState,
     getRotation: function () {

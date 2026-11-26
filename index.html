@@ -17,12 +17,12 @@
     <title>纹现 · 民族纹样数字创意平台</title>
     <!-- 真 3D 展示依赖：本地 Three.js（r128 UMD）+ 纹现 3D 运行时，离线可用 -->
     <script src="./assets/three.min.js"></script>
-    <script src="./assets/wx3d-runtime.js?v=v33"></script>
-    <script type="module" crossorigin src="./assets/index-BdAhaWoD.js?v=v33"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Dat4QQay.css?v=v33">
+    <script src="./assets/wx3d-runtime.js?v=v34"></script>
+    <script type="module" crossorigin src="./assets/index-BdAhaWoD.js?v=v34"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dat4QQay.css?v=v34">
     <!-- v21 屏幕自适应：手机 / 平板 / 笔记本 / 宽屏统一响应式布局 -->
     <link rel="stylesheet" crossorigin href="./assets/responsive.css?v=v21">
-    <!-- v33 变更：纹样志详情弹窗移除大图下方突兀的配色预览小图条（Gallery.tsx:114 纯展示块，无状态依赖）。v32：新增 20 个全新立体载体，共 32 类。v31：解除旋转死角实现 360° 查看。v30：晴雨伞点击开合。v29：折扇点击开合。v25 颜色/复制/多格式导出保留 -->
+    <!-- v34 变更：彻底删除 13 个载体（晴雨伞/茶壶/香薰蜡烛/茶叶罐/笔筒/随行杯/宫灯/托盘/棒球帽/帆布袋/袜子/蓝牙音箱/座钟），从 32 类精简到 19 类——同步移除产品定义、3D 几何分支、开合逻辑、缩略图。v33：纹样志弹窗移除配色小图条。v31：360° 无死角查看。v29：折扇点击开合。v25 颜色/复制/多格式导出保留 -->
   </head>
   <body>
     <div id="root"></div>
